@@ -39,14 +39,12 @@
         <option value="">Loading…</option>
       </select>
       <button class="btn btn-sm btn-success" id="btn-save-file" onclick="saveToFileHandle()"
-        title="Save changes directly back to the original .sqlite file on disk"
-        style="display: none; padding: 5px 10px; font-size: 12px">
+        title="Save changes directly back to the original .sqlite file on disk" style="display: none">
         💾 Save to File
       </button>
-      <button class="btn btn-sm btn-outline" id="btn-download-db" onclick="exportSqliteDatabase()"
-        title="Download / Export modified .sqlite file to your computer"
-        style="display: none; padding: 5px 10px; font-size: 12px; color: #fff; border-color: rgba(255,255,255,0.2)">
-        ⬇️ Export .sqlite
+      <button class="btn btn-sm db-action-export" id="btn-download-db" onclick="exportSqliteDatabase()"
+        title="Download / Export modified .sqlite file to your computer" style="display: none">
+        ⬇ Export SQLite
       </button>
       <input type="file" id="file-upload-input" accept=".sqlite" style="display: none"
         onchange="handleFileUpload(this.files[0])" />

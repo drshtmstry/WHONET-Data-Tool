@@ -97,7 +97,7 @@ function markModified() {
       saveBtn.style.display = 'inline-flex';
       saveBtn.classList.remove('btn-outline');
       saveBtn.classList.add('btn-success');
-      saveBtn.innerHTML = '💾 Save to File •';
+      saveBtn.innerHTML = '💾 Save to File';
     }
   }
   const dlBtn = document.getElementById('btn-download-db');
