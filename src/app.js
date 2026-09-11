@@ -1767,6 +1767,15 @@ function renderLaunchDbSelect() {
     }
     if (btnPickFolder) {
       btnPickFolder.style.display = 'inline-flex';
+      const folderConnected = Boolean(state.dirHandle);
+      btnPickFolder.classList.toggle('btn-primary', !folderConnected);
+      btnPickFolder.classList.toggle('btn-success', folderConnected);
+      btnPickFolder.textContent = folderConnected
+        ? '✓ Folder Connected'
+        : '📂 Select WHONET Folder (C:\\WHONET\\Data)';
+      btnPickFolder.title = folderConnected
+        ? 'Select a different WHONET data folder'
+        : 'Select the WHONET data folder';
     }
 
     const localDbs = state.databases || [];
