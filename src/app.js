@@ -50,9 +50,9 @@ const debouncedLoadIsolates = debounce(() => loadIsolates(1), 350);
 const debouncedLoadDups = debounce(() => loadDuplicates(1), 350);
 
 // ── sql.js WebAssembly Loader ──
-async function initSqlJs() {
+async function getSqlJs() {
   if (state.sqlJsInstance) return state.sqlJsInstance;
-  if (typeof initSqlJs === 'undefined' && typeof window.initSqlJs === 'undefined') {
+  if (typeof window.initSqlJs !== 'function') {
     throw new Error('sql.js library not loaded in browser');
   }
   const SQL = await window.initSqlJs({
@@ -385,6 +385,80 @@ function handleWasmApi(path, options = {}) {
       return { months: sortedMonths, monthlyData };
     }
 
+    if (pathname === '/api/chart-data') {
+      const param = (url.searchParams.get('param') || 'ORGANISM').toUpperCase();
+      const period = url.searchParams.get('period') || 'all';
+      const startDate = url.searchParams.get('startDate') || '';
+      const endDate = url.searchParams.get('endDate') || '';
+
+      const whereClauses = [];
+      const params = [];
+
+      if (startDate) {
+        whereClauses.push("SPEC_DATE >= ?");
+        params.push(startDate);
+      }
+      if (endDate) {
+        whereClauses.push("SPEC_DATE <= ?");
+        params.push(endDate);
+      }
+
+      if (!startDate && !endDate && period !== 'all') {
+        const maxDateRow = wasmSelect("SELECT MAX(SPEC_DATE) as m FROM Isolates WHERE SPEC_DATE IS NOT NULL AND SPEC_DATE != ''")[0];
+        if (maxDateRow && maxDateRow.m) {
+          const maxD = new Date(maxDateRow.m.substring(0, 10));
+          if (!isNaN(maxD.getTime())) {
+            let monthsBack = 3;
+            if (period === '6m') monthsBack = 6;
+            if (period === '12m') monthsBack = 12;
+            const cutoff = new Date(maxD);
+            cutoff.setMonth(cutoff.getMonth() - monthsBack);
+            const cutoffStr = cutoff.toISOString().substring(0, 10);
+            whereClauses.push("SPEC_DATE >= ?");
+            params.push(cutoffStr);
+          }
+        }
+      }
+
+      let selectExpr = param;
+      if (param === 'AGE_GROUP') {
+        selectExpr = `
+          CASE
+            WHEN CAST(AGE AS INTEGER) < 1 THEN '<1 yr'
+            WHEN CAST(AGE AS INTEGER) BETWEEN 1 AND 12 THEN '1-12 yrs'
+            WHEN CAST(AGE AS INTEGER) BETWEEN 13 AND 25 THEN '13-25 yrs'
+            WHEN CAST(AGE AS INTEGER) BETWEEN 26 AND 45 THEN '26-45 yrs'
+            WHEN CAST(AGE AS INTEGER) BETWEEN 46 AND 65 THEN '46-65 yrs'
+            WHEN CAST(AGE AS INTEGER) > 65 THEN '>65 yrs'
+            ELSE 'Unknown'
+          END
+        `;
+      }
+
+      const whereSql = whereClauses.length
+        ? `WHERE ${selectExpr} IS NOT NULL AND ${selectExpr} != '' AND ` + whereClauses.join(' AND ')
+        : `WHERE ${selectExpr} IS NOT NULL AND ${selectExpr} != ''`;
+
+      const querySql = `
+        SELECT ${selectExpr} as label, COUNT(*) as count
+        FROM Isolates
+        ${whereSql}
+        GROUP BY label
+        ORDER BY count DESC
+        LIMIT 15
+      `;
+
+      const rows = wasmSelect(querySql, params);
+      const totalFiltered = wasmSelect(`SELECT COUNT(*) as c FROM Isolates ${whereClauses.length ? 'WHERE ' + whereClauses.join(' AND ') : ''}`, params)[0]?.c || 0;
+
+      return {
+        param,
+        period,
+        totalFiltered,
+        rows
+      };
+    }
+
     return { error: `Unhandled WASM route: ${pathname}` };
   } catch (err) {
     return { error: `WASM Execution error: ${err.message}` };
@@ -537,7 +611,7 @@ async function loadSampleDatabase(sampleFilename) {
     }
     const arrayBuffer = await res.arrayBuffer();
     const uInt8Array = new Uint8Array(arrayBuffer);
-    const SQL = await initSqlJs();
+    const SQL = await getSqlJs();
     const db = new SQL.Database(uInt8Array);
 
     state.isWasmMode = true;
@@ -598,7 +672,7 @@ async function handleFileUpload(file) {
 
   // Client-side WASM SQLite fallback / Web mode
   try {
-    const SQL = await initSqlJs();
+    const SQL = await getSqlJs();
     const arrayBuffer = await file.arrayBuffer();
     const uInt8Array = new Uint8Array(arrayBuffer);
     const db = new SQL.Database(uInt8Array);
@@ -693,12 +767,270 @@ function handleFileDrop(e) {
       wardFilter.innerHTML = '<option value="">All Wards</option>' +
         data.wards.map(w => `<option value="${w}">${w}</option>`).join('');
 
-      // Organisms list
-      document.getElementById('org-list').innerHTML = data.organisms.slice(0, 20).map(o => {
-        const name = getOrganismName(o);
-        const titleAttr = name ? `title="${name} (${o})"` : `title="${o}"`;
-        return `<span class="badge badge-org" ${titleAttr} style="cursor:pointer" onclick="showPage('isolates');document.getElementById('isolates-org-filter').value='${o}';loadIsolates(1)">${o}</span>`;
-      }).join('');
+      // Organisms list (if present in DOM)
+      const orgListEl = document.getElementById('org-list');
+      if (orgListEl) {
+        orgListEl.innerHTML = data.organisms.slice(0, 20).map(o => {
+          const name = getOrganismName(o);
+          const titleAttr = name ? `title="${name} (${o})"` : `title="${o}"`;
+          return `<span class="badge badge-org" ${titleAttr} style="cursor:pointer" onclick="showPage('isolates');document.getElementById('isolates-org-filter').value='${o}';loadIsolates(1)">${o}</span>`;
+        }).join('');
+      }
+
+      // Refresh dynamic visual charts
+      updateDashboardCharts();
+    }
+
+    // ── Dynamic Visual Analytics (Chart.js Engine) ──
+    let barChartInstance = null;
+    let pieChartInstance = null;
+    let currentChartDisplayMode = 'both'; // 'both' | 'bar' | 'pie'
+
+    function setChartTypeMode(mode) {
+      currentChartDisplayMode = mode;
+      const grid = document.getElementById('charts-view-grid');
+      if (grid) {
+        grid.classList.remove('single-bar', 'single-pie');
+        if (mode === 'bar') grid.classList.add('single-bar');
+        if (mode === 'pie') grid.classList.add('single-pie');
+      }
+
+      ['both', 'bar', 'pie'].forEach(m => {
+        const btn = document.getElementById(`btn-chart-${m}`);
+        if (btn) btn.classList.toggle('active', m === mode);
+      });
+
+      if (barChartInstance) barChartInstance.resize();
+      if (pieChartInstance) pieChartInstance.resize();
+    }
+
+    function onPeriodFilterChange() {
+      const period = document.getElementById('chart-period-select')?.value || 'all';
+      const customDates = document.getElementById('chart-custom-dates');
+      if (customDates) {
+        customDates.style.display = period === 'custom' ? 'flex' : 'none';
+      }
+      updateDashboardCharts();
+    }
+
+    function resetChartZoom(chartType) {
+      if (chartType === 'bar' && barChartInstance) {
+        barChartInstance.resetZoom ? barChartInstance.resetZoom() : barChartInstance.update();
+      }
+      updateDashboardCharts();
+    }
+
+    const PALETTE_COLORS = [
+      '#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed',
+      '#0891b2', '#db2777', '#4f46e5', '#ca8a04', '#16a34a',
+      '#ea580c', '#9333ea', '#0284c7', '#65a30d', '#64748b'
+    ];
+
+    async function updateDashboardCharts() {
+      if (!state.currentDb) return;
+      if (typeof Chart === 'undefined') {
+        console.warn('Chart.js library is not yet loaded');
+        return;
+      }
+
+      const param = document.getElementById('chart-param-select')?.value || 'ORGANISM';
+      const period = document.getElementById('chart-period-select')?.value || 'all';
+      const startDate = document.getElementById('chart-date-start')?.value || '';
+      const endDate = document.getElementById('chart-date-end')?.value || '';
+
+      const queryParams = new URLSearchParams({
+        param,
+        period,
+        startDate,
+        endDate
+      });
+
+      const res = await api(`/api/chart-data?${queryParams.toString()}`);
+      if (res.error) {
+        console.warn('Chart data query failed:', res.error);
+        return;
+      }
+
+      const rows = res.rows || [];
+      const totalFiltered = res.totalFiltered || 0;
+
+      // Update subtitle info
+      const sub = document.getElementById('chart-filtered-sub');
+      const paramText = document.getElementById('chart-param-select')?.selectedOptions[0]?.text || param;
+      if (sub) {
+        const periodText = period === 'custom'
+          ? `Range: ${startDate || 'start'} to ${endDate || 'end'}`
+          : document.getElementById('chart-period-select')?.selectedOptions[0]?.text || period;
+        sub.textContent = `${paramText} • ${periodText} • ${totalFiltered.toLocaleString()} isolates matched`;
+      }
+
+      const pieBadge = document.getElementById('pie-total-badge');
+      if (pieBadge) {
+        pieBadge.textContent = `${totalFiltered.toLocaleString()} records`;
+      }
+
+      // Format Labels with human-friendly descriptions
+      const labels = rows.map(r => {
+        let label = String(r.label || 'Unknown');
+        if (param === 'ORGANISM') {
+          const orgName = getOrganismName(label);
+          if (orgName) return `${orgName} (${label})`;
+        }
+        if (param === 'SPEC_TYPE') {
+          const dict = { bl: 'Blood (bl)', ps: 'Pus (ps)', sp: 'Sputum (sp)', ur: 'Urine (ur)', st: 'Stool (st)', cs: 'CSF (cs)' };
+          if (dict[label.toLowerCase()]) return dict[label.toLowerCase()];
+        }
+        if (param === 'WARD_TYPE') {
+          const dict = { in: 'Inpatient (in)', out: 'Outpatient (out)', icu: 'ICU (icu)' };
+          if (dict[label.toLowerCase()]) return dict[label.toLowerCase()];
+        }
+        if (param === 'SEX') {
+          const dict = { m: 'Male (m)', f: 'Female (f)', u: 'Unknown (u)' };
+          if (dict[label.toLowerCase()]) return dict[label.toLowerCase()];
+        }
+        return label;
+      });
+
+      const counts = rows.map(r => r.count);
+      const bgColors = rows.map((_, i) => PALETTE_COLORS[i % PALETTE_COLORS.length]);
+
+      // ── Render Bar Chart ──
+      const barCanvas = document.getElementById('dashboard-bar-chart');
+      if (barCanvas) {
+        const barCtx = barCanvas.getContext('2d');
+        if (barChartInstance) barChartInstance.destroy();
+
+        barChartInstance = new Chart(barCtx, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Isolates Count',
+              data: counts,
+              backgroundColor: bgColors.map(c => c + 'cc'),
+              borderColor: bgColors,
+              borderWidth: 1.5,
+              borderRadius: 5,
+              maxBarThickness: 38
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 400 },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                titleFont: { family: 'Inter', size: 12, weight: 'bold' },
+                bodyFont: { family: 'Inter', size: 12 },
+                padding: 10,
+                callbacks: {
+                  label: ctx => {
+                    const cnt = ctx.parsed.y || 0;
+                    const pct = totalFiltered > 0 ? ((cnt / totalFiltered) * 100).toFixed(1) : '0.0';
+                    return `Count: ${cnt.toLocaleString()} (${pct}%)`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: {
+                  font: { family: 'Inter', size: 11 },
+                  color: '#475569',
+                  maxRotation: 40,
+                  minRotation: 0,
+                  callback: function(val, index) {
+                    const raw = labels[index] || '';
+                    return raw.length > 20 ? raw.substring(0, 18) + '…' : raw;
+                  }
+                }
+              },
+              y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(226, 232, 240, 0.8)' },
+                ticks: {
+                  font: { family: 'JetBrains Mono', size: 11 },
+                  color: '#64748b',
+                  precision: 0
+                }
+              }
+            }
+          }
+        });
+      }
+
+      // ── Render Pie / Doughnut Chart ──
+      const pieCanvas = document.getElementById('dashboard-pie-chart');
+      if (pieCanvas) {
+        const pieCtx = pieCanvas.getContext('2d');
+        if (pieChartInstance) pieChartInstance.destroy();
+
+        pieChartInstance = new Chart(pieCtx, {
+          type: 'doughnut',
+          data: {
+            labels,
+            datasets: [{
+              data: counts,
+              backgroundColor: bgColors,
+              borderColor: '#ffffff',
+              borderWidth: 2,
+              hoverOffset: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 400 },
+            plugins: {
+              legend: {
+                position: 'right',
+                labels: {
+                  boxWidth: 12,
+                  boxHeight: 12,
+                  padding: 8,
+                  font: { family: 'Inter', size: 11 },
+                  color: '#334155',
+                  generateLabels: function(chart) {
+                    const data = chart.data;
+                    if (data.labels.length && data.datasets.length) {
+                      return data.labels.map((lbl, i) => {
+                        const val = data.datasets[0].data[i] || 0;
+                        const pct = totalFiltered > 0 ? ((val / totalFiltered) * 100).toFixed(1) : 0;
+                        const shortLbl = lbl.length > 16 ? lbl.substring(0, 14) + '…' : lbl;
+                        return {
+                          text: `${shortLbl} (${pct}%)`,
+                          fillStyle: data.datasets[0].backgroundColor[i],
+                          strokeStyle: '#fff',
+                          lineWidth: 1,
+                          index: i
+                        };
+                      });
+                    }
+                    return [];
+                  }
+                }
+              },
+              tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                titleFont: { family: 'Inter', size: 12, weight: 'bold' },
+                bodyFont: { family: 'Inter', size: 12 },
+                padding: 10,
+                callbacks: {
+                  label: ctx => {
+                    const cnt = ctx.parsed || 0;
+                    const pct = totalFiltered > 0 ? ((cnt / totalFiltered) * 100).toFixed(1) : '0.0';
+                    return ` ${cnt.toLocaleString()} isolates (${pct}%)`;
+                  }
+                }
+              }
+            },
+            cutout: '58%'
+          }
+        });
+      }
     }
 
     // ── Isolates table ──

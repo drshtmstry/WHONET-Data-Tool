@@ -4,7 +4,23 @@
   <img src="https://whonet.org/img/WHONET_Logo_transparentbg.png" alt="WHONET Logo" width="100" />
   <h3>Laboratory Database Management, Deduplication &amp; AMR Surveillance Reporting</h3>
   <p>Free open-source community utility for clinical and public health microbiologists.</p>
+  <p>
+    🌐 <strong>Live Web App:</strong> <a href="https://whonet-tool.vercel.app/">https://whonet-tool.vercel.app/</a>
+  </p>
 </div>
+
+---
+
+## 🌐 Live Web App
+
+Use the tool directly in your browser without any installation:
+**[https://whonet-tool.vercel.app/](https://whonet-tool.vercel.app/)**
+
+> [!IMPORTANT]
+>
+> - **100% Private & Client-Side**: This tool **does not upload any data to servers**. All SQLite processing, queries, deduplication, and calculations happen strictly locally within your browser using WebAssembly (`sql.js`).
+> - **Data Quality Dependency**: Generated surveillance statistics, counts, and monthly breakdown tables depend directly on the quality, completeness, and standardization of data entered in your WHONET laboratory records (e.g., organism codes, specimen types, ward designations).
+> - **Mandatory Verification**: All generated figures and tables must be **verified manually by qualified laboratory personnel / microbiologists** before submitting to any state, national, or organizational surveillance bodies (such as SAPCAR-Gujarat, ICMR, or national AMR containment programs).
 
 ---
 
@@ -13,6 +29,7 @@
 The **WHONET Data Tool** is a web-based utility designed to inspect, deduplicate, clean, and analyze antimicrobial resistance (AMR) laboratory databases stored in SQLite format (`.sqlite`). It supports both local automated path discovery and web-based drag-and-drop file inspection.
 
 ### Key Features
+
 - **Zero-Lock Database Engine**: On-demand SQLite access with automatic connection closing, preventing Windows file locking conflicts with official WHONET software.
 - **Two Flexible Loading Modes**:
   1. **Direct Path Reading**: Auto-discovers and reads `.sqlite` files directly from `C:\WHONET\Data` or any custom system path.
@@ -21,9 +38,13 @@ The **WHONET Data Tool** is a web-based utility designed to inspect, deduplicate
 - **Monthly AMR Surveillance Report (SAPCAR-Gujarat / National AMR Containment)**:
   - Generates standard monthly reporting tables showing culture totals and positive cultures across source (OPD, IPD, ICU, Others) and specimen type (Blood, Pus, Sputum, Urine, Others).
   - Micro-accurate culture growth rules:
-    - **Blood (`bl`)**: Sterile / no growth excludes `xxx`, `xpa`, `xep`, `xsg`, `nor`, and skin contaminants (`scn` / CoNS). *(Oral and vaginal flora are not applicable to blood).*
+    - **Blood (`bl`)**: Sterile / no growth excludes `xxx`, `xpa`, `xep`, `xsg`, `nor`, and skin contaminants (`scn` / CoNS). _(Oral and vaginal flora are not applicable to blood)._
     - **Other Specimens**: Sterile / no growth excludes `xxx`, `xpa`, `xep`, `xsg`, `nor`, `ora` (oral flora), and `vag` (vaginal flora).
   - One-click **Copy Table (TSV / Excel)** and **Export All Months (CSV)**.
+- **Dynamic Visual Analytics & Charts (Bar & Pie/Doughnut)**:
+  - Interactive distribution charts across key parameters: Organisms, Specimen Types, Wards, Location Types (OPD/IPD/ICU), Departments, Gender, Age Demographics, and AMR phenotypes (ESBL, Carbapenem, MRSA).
+  - Time period filtering: All Time, Last 3 Months, Last 6 Months, Last 12 Months, or Custom Start/End Date Range.
+  - View layout toggles: Dual Bar + Pie, Bar Only, or Doughnut/Pie Only.
 - **Bulk Corrections**: Normalize casing (`SPEC_NUM`, `PATIENT_ID` to uppercase, `ORGANISM` to lowercase) and trim whitespace across all fields.
 - **Built-in SQL Editor**: Execute custom SQLite queries directly against active databases.
 
@@ -49,6 +70,7 @@ whonet/
 ## 🚀 Getting Started
 
 Run the development server locally:
+
 ```bash
 npm run dev
 ```

@@ -175,6 +175,20 @@ function handleRequest(req, res) {
     }
   }
 
+  if (path === '/chart.umd.min.js') {
+    const chartPath = existsSync(join(__dirname, 'src', 'chart.umd.min.js'))
+      ? join(__dirname, 'src', 'chart.umd.min.js')
+      : join(__dirname, 'chart.umd.min.js');
+    if (existsSync(chartPath)) {
+      const js = readFileSync(chartPath, 'utf8');
+      res.writeHead(200, {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Cache-Control': 'public, max-age=86400'
+      });
+      return res.end(js);
+    }
+  }
+
   if (path === '/whonet-logo.png') {
     const logoPath = existsSync(join(__dirname, 'src', 'whonet-logo.png'))
       ? join(__dirname, 'src', 'whonet-logo.png')
@@ -199,16 +213,22 @@ function handleRequest(req, res) {
   }
 
   if (path.startsWith('/sample-data/')) {
-    const samplePath = existsSync(join(__dirname, 'src', path))
-      ? join(__dirname, 'src', path)
-      : join(__dirname, path);
-    if (existsSync(samplePath)) {
-      const data = readFileSync(samplePath);
-      res.writeHead(200, {
-        'Content-Type': 'application/x-sqlite3',
-        'Cache-Control': 'public, max-age=86400'
-      });
-      return res.end(data);
+    const filename = basename(path);
+    const candidates = [
+      join(__dirname, 'src', path),
+      join(__dirname, 'public', path),
+      join(__dirname, path),
+      join(WHONET_DIR, filename)
+    ];
+    for (const samplePath of candidates) {
+      if (existsSync(samplePath)) {
+        const data = readFileSync(samplePath);
+        res.writeHead(200, {
+          'Content-Type': 'application/x-sqlite3',
+          'Cache-Control': 'public, max-age=86400'
+        });
+        return res.end(data);
+      }
     }
   }
 
@@ -496,6 +516,97 @@ function handleRequest(req, res) {
         sendJson(res, {
           months: sortedMonths,
           monthlyData
+        });
+      });
+    } catch (e) {
+      sendJson(res, { error: e.message }, 500);
+    }
+    return;
+  }
+
+  // API: Dynamic chart aggregated analytics
+  if (path === '/api/chart-data' && req.method === 'GET') {
+    if (!currentDbFullPath) return sendJson(res, { error: 'No database open' }, 400);
+    try {
+      const param = (urlObj.searchParams.get('param') || 'ORGANISM').toUpperCase();
+      const period = urlObj.searchParams.get('period') || 'all';
+      const startDate = urlObj.searchParams.get('startDate') || '';
+      const endDate = urlObj.searchParams.get('endDate') || '';
+
+      const ALLOWED_PARAMS = [
+        'ORGANISM', 'SPEC_TYPE', 'WARD', 'WARD_TYPE', 'DEPARTMENT',
+        'SEX', 'AGE_GROUP', 'ESBL', 'CARBAPENEM', 'MRSA'
+      ];
+      if (!ALLOWED_PARAMS.includes(param)) {
+        return sendJson(res, { error: 'Invalid parameter for chart aggregation' }, 400);
+      }
+
+      withDb(db => {
+        const whereClauses = [];
+        const params = [];
+
+        // Apply period / date filters on SPEC_DATE
+        if (startDate) {
+          whereClauses.push("SPEC_DATE >= ?");
+          params.push(startDate);
+        }
+        if (endDate) {
+          whereClauses.push("SPEC_DATE <= ?");
+          params.push(endDate);
+        }
+
+        // Relative periods based on maximum date available in current database
+        if (!startDate && !endDate && period !== 'all') {
+          const maxDateRow = db.prepare("SELECT MAX(SPEC_DATE) as m FROM Isolates WHERE SPEC_DATE IS NOT NULL AND SPEC_DATE != ''").get();
+          if (maxDateRow && maxDateRow.m) {
+            const maxD = new Date(maxDateRow.m.substring(0, 10));
+            if (!isNaN(maxD.getTime())) {
+              let monthsBack = 3;
+              if (period === '6m') monthsBack = 6;
+              if (period === '12m') monthsBack = 12;
+              const cutoff = new Date(maxD);
+              cutoff.setMonth(cutoff.getMonth() - monthsBack);
+              const cutoffStr = cutoff.toISOString().substring(0, 10);
+              whereClauses.push("SPEC_DATE >= ?");
+              params.push(cutoffStr);
+            }
+          }
+        }
+
+        let selectExpr = param;
+        if (param === 'AGE_GROUP') {
+          selectExpr = `
+            CASE
+              WHEN CAST(AGE AS INTEGER) < 1 THEN '<1 yr'
+              WHEN CAST(AGE AS INTEGER) BETWEEN 1 AND 12 THEN '1-12 yrs'
+              WHEN CAST(AGE AS INTEGER) BETWEEN 13 AND 25 THEN '13-25 yrs'
+              WHEN CAST(AGE AS INTEGER) BETWEEN 26 AND 45 THEN '26-45 yrs'
+              WHEN CAST(AGE AS INTEGER) BETWEEN 46 AND 65 THEN '46-65 yrs'
+              WHEN CAST(AGE AS INTEGER) > 65 THEN '>65 yrs'
+              ELSE 'Unknown'
+            END
+          `;
+        }
+
+        const whereSql = whereClauses.length ? `WHERE ${selectExpr} IS NOT NULL AND ${selectExpr} != '' AND ` + whereClauses.join(' AND ') : `WHERE ${selectExpr} IS NOT NULL AND ${selectExpr} != ''`;
+
+        const querySql = `
+          SELECT ${selectExpr} as label, COUNT(*) as count
+          FROM Isolates
+          ${whereSql}
+          GROUP BY label
+          ORDER BY count DESC
+          LIMIT 15
+        `;
+
+        const rows = db.prepare(querySql).all(...params);
+        const totalFiltered = db.prepare(`SELECT COUNT(*) as c FROM Isolates ${whereClauses.length ? 'WHERE ' + whereClauses.join(' AND ') : ''}`).get(...params).c;
+
+        sendJson(res, {
+          param,
+          period,
+          totalFiltered,
+          rows
         });
       });
     } catch (e) {
