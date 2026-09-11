@@ -640,34 +640,6 @@ async function switchDb(filename) {
   loadStats();
 }
 
-// ── Open by Custom Path ──
-async function openPathPrompt() {
-  const defaultPath = 'C:\\WHONET\\Data\\';
-  const inputPath = prompt('Enter the absolute path to your WHONET .sqlite database file:', defaultPath);
-  if (!inputPath || !inputPath.trim()) return;
-
-  const trimmed = inputPath.trim().replace(/^"|"$/g, ''); // strip quotes if copied as path
-  if (!trimmed.toLowerCase().endsWith('.sqlite')) {
-    return toast('Please select a valid .sqlite file', 'error');
-  }
-
-  toast('Opening database from path…', 'info');
-  const data = await api('/api/open-database', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path: trimmed })
-  });
-
-  if (data.error) return toast(data.error, 'error');
-  state.currentDb = data.filename;
-  if (!state.databases.includes(data.filename)) {
-    state.databases.push(data.filename);
-  }
-  renderDbSelector();
-  toast(`✓ Opened ${data.filename} (${data.count.toLocaleString()} records)`, 'success');
-  loadStats();
-}
-
 // ── Export / Download .sqlite (for in-browser WASM changes) ──
 function exportSqliteDatabase() {
   if (!state.wasmDb) {
@@ -835,34 +807,6 @@ async function loadStats() {
   const activeDupCount = state.dupMode === 'patient' ? (data.dupPtRows || 0) : (data.dupRows || 0);
   document.getElementById('dup-badge').textContent = activeDupCount;
 
-  document.getElementById('stats-grid').innerHTML = `
-    <div class="stat-card">
-      <div class="stat-label">Total Isolates</div>
-      <div class="stat-value">${data.total.toLocaleString()}</div>
-    </div>
-    <div class="stat-card red" style="cursor:pointer;" onclick="showPage('duplicates');setDupMode('spec');" title="Click to view Specimen Duplicates">
-      <div class="stat-label">Dupes (by Specimen)</div>
-      <div class="stat-value">${data.dupRows || 0}</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:4px;">${data.dupGroups || 0} groups</div>
-    </div>
-    <div class="stat-card" style="--accent: var(--yellow);cursor:pointer;" onclick="showPage('duplicates');setDupMode('patient');" title="Click to view Patient Duplicates">
-      <div class="stat-label">Dupes (by Patient ID)</div>
-      <div class="stat-value" style="color:var(--yellow)">${data.dupPtRows || 0}</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:4px;">${data.dupPtGroups || 0} groups</div>
-    </div>
-    <div class="stat-card green">
-      <div class="stat-label">Unique Organisms</div>
-      <div class="stat-value">${data.organisms.length}</div>
-    </div>
-    <div class="stat-card" style="--accent: #0d6efd;cursor:pointer;border-left:4px solid #0d6efd;" onclick="showPage('monthly-amr')" title="Open SAPCAR-Gujarat Monthly AMR Report">
-      <div class="stat-label">Monthly AMR Data</div>
-      <div class="stat-value" style="font-size:24px;color:#0d6efd;display:flex;align-items:center;gap:6px;">
-        <span>📋 SAPCAR</span>
-      </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:4px;">C&amp;S Surveillance Report →</div>
-    </div>
-  `;
-
   // Populate filters
   const orgFilter = document.getElementById('isolates-org-filter');
   orgFilter.innerHTML = '<option value="">All Organisms</option>' +
@@ -887,6 +831,10 @@ async function loadStats() {
 
   // Refresh dynamic visual charts
   updateDashboardCharts();
+
+  if (document.getElementById('page-monthly-amr')?.classList.contains('active')) {
+    loadMonthlyAmrData();
+  }
 }
 
 // ── Dynamic Visual Analytics (Chart.js Engine) ──
@@ -1602,7 +1550,7 @@ function renderAmrTable() {
   const data = state.monthlyAmrData;
   if (!data || !data.monthlyData || !data.monthlyData.length) {
     document.getElementById('amr-table-body').innerHTML = `
-          <tr><td colspan="23" style="padding:24px;text-align:center;color:var(--text3);">No monthly records found</td></tr>
+          <tr><td colspan="24" style="padding:24px;text-align:center;color:var(--text3);">No monthly records found</td></tr>
         `;
     return;
   }
@@ -2003,11 +1951,6 @@ async function selectFromLaunchList() {
 
   await switchDb(filename);
   document.getElementById('source-modal').classList.remove('open');
-}
-
-async function openPathFromLaunch() {
-  document.getElementById('source-modal').classList.remove('open');
-  await openPathPrompt();
 }
 
 async function triggerBrowseFile() {

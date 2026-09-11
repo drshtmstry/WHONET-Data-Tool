@@ -157,7 +157,7 @@
     <main class="main">
       <!-- Dashboard -->
       <div class="page active" id="page-dashboard">
-        <!-- Drag & drop / custom path banner -->
+        <!-- Drag & drop / upload banner -->
         <div class="db-dropzone" id="global-dropzone" ondragover="
               event.preventDefault();
               this.classList.add('dragover');
@@ -173,9 +173,6 @@
           <div class="db-source-tabs" onclick="event.stopPropagation()">
             <button class="btn btn-sm btn-primary" onclick="document.getElementById('file-upload-input').click()">
               ⬆ Choose SQLite File
-            </button>
-            <button class="btn btn-sm btn-ghost" onclick="openPathPrompt()" id="dropzone-btn-path">
-              📂 Open Local Path…
             </button>
             <button class="btn btn-sm btn-ghost" onclick="loadSampleDatabase('WHO-TST-2020-01.sqlite')"
               title="Load bundled sample dataset">
@@ -197,13 +194,6 @@
             ↺ Refresh
           </button>
         </div>
-        <div class="stats-grid" id="stats-grid">
-          <div class="stat-card">
-            <div class="stat-label">Loading…</div>
-            <div class="stat-value">—</div>
-          </div>
-        </div>
-
         <!-- Dynamic Visual Analytics Section -->
         <div class="chart-analytics-card" id="chart-analytics-card">
           <div class="chart-controls-bar">
@@ -644,11 +634,14 @@
             <button class="btn btn-ghost btn-sm" onclick="copyAmrTableTsv()">
               📋 Copy Table (TSV / Excel)
             </button>
+            <button class="btn btn-ghost btn-sm" onclick="loadMonthlyAmrData()">
+              ↺ Refresh Report
+            </button>
           </div>
         </div>
 
         <!-- Official Standard Reporting Table -->
-        <div class="table-wrap" style="box-shadow: var(--shadow); overflow-x: auto">
+        <div class="table-wrap" style="box-shadow: var(--shadow); overflow: hidden">
           <div style="
                 padding: 14px 18px;
                 background: var(--bg3);
@@ -666,77 +659,79 @@
             </div>
           </div>
 
-          <table class="amr-report-table" style="
-                width: 100%;
+          <div class="amr-table-scroll">
+            <table class="amr-report-table" style="
+                min-width: 1520px;
                 border-collapse: separate;
                 border-spacing: 0;
                 text-align: center;
                 font-size: 12px;
               ">
-            <thead>
-              <tr class="amr-th-primary">
-                <th rowspan="2" class="th-month">Month, Year</th>
-                <th colspan="4" class="th-group-samples-src">
-                  Total no. of samples received for culture (Source of sample)
-                </th>
-                <th rowspan="2" class="th-total-col">Total sample</th>
-                <th colspan="4" class="th-group-pos-src">
-                  Total no. of Culture Positive Samples
-                </th>
-                <th rowspan="2" class="th-total-pos-col">
-                  Total positive sample
-                </th>
-                <th colspan="5" class="th-group-samples-type">
-                  Total no.of Samples received for culture (Type of sample)
-                </th>
-                <th rowspan="2" class="th-total-col">Total sample</th>
-                <th colspan="5" class="th-group-pos-type">
-                  Total no. of Culture Positive Samples
-                </th>
-                <th rowspan="2" class="th-total-pos-col">
-                  Total positive sample
-                </th>
-              </tr>
-              <tr class="amr-th-sub">
-                <!-- Source of Sample -->
-                <th>OPD</th>
-                <th>IPD</th>
-                <th>ICU</th>
-                <th>Others</th>
+              <thead>
+                <tr class="amr-th-primary">
+                  <th rowspan="2" class="th-month">Month, Year</th>
+                  <th colspan="4" class="th-group-samples-src">
+                    Total no. of samples received for culture (Source of sample)
+                  </th>
+                  <th rowspan="2" class="th-total-col">Total sample</th>
+                  <th colspan="4" class="th-group-pos-src">
+                    Total no. of Culture Positive Samples
+                  </th>
+                  <th rowspan="2" class="th-total-pos-col">
+                    Total positive sample
+                  </th>
+                  <th colspan="5" class="th-group-samples-type">
+                    Total no.of Samples received for culture (Type of sample)
+                  </th>
+                  <th rowspan="2" class="th-total-col">Total sample</th>
+                  <th colspan="5" class="th-group-pos-type">
+                    Total no. of Culture Positive Samples
+                  </th>
+                  <th rowspan="2" class="th-total-pos-col">
+                    Total positive sample
+                  </th>
+                </tr>
+                <tr class="amr-th-sub">
+                  <!-- Source of Sample -->
+                  <th>OPD</th>
+                  <th>IPD</th>
+                  <th>ICU</th>
+                  <th>Others</th>
 
-                <!-- Positive by Source -->
-                <th>OPD</th>
-                <th>IPD</th>
-                <th>ICU</th>
-                <th>Others</th>
+                  <!-- Positive by Source -->
+                  <th>OPD</th>
+                  <th>IPD</th>
+                  <th>ICU</th>
+                  <th>Others</th>
 
-                <!-- Type of sample -->
-                <th>Blood</th>
-                <th>Pus</th>
-                <th>Sputum</th>
-                <th>Urine</th>
-                <th>Others</th>
+                  <!-- Type of sample -->
+                  <th>Blood</th>
+                  <th>Pus</th>
+                  <th>Sputum</th>
+                  <th>Urine</th>
+                  <th>Others</th>
 
-                <!-- Positive by Type -->
-                <th>Blood</th>
-                <th>Pus</th>
-                <th>Sputum</th>
-                <th>Urine</th>
-                <th>Others</th>
-              </tr>
-            </thead>
-            <tbody id="amr-table-body">
-              <tr>
-                <td colspan="26" style="
+                  <!-- Positive by Type -->
+                  <th>Blood</th>
+                  <th>Pus</th>
+                  <th>Sputum</th>
+                  <th>Urine</th>
+                  <th>Others</th>
+                </tr>
+              </thead>
+              <tbody id="amr-table-body">
+                <tr>
+                  <td colspan="26" style="
                       padding: 24px;
                       text-align: center;
                       color: var(--text3);
                     ">
-                  Loading AMR data…
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                    Loading AMR data…
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Instructions card based on official Circular -->
@@ -1009,13 +1004,6 @@
               </button>
               <input type="file" id="folder-input-fallback" webkitdirectory directory style="display: none"
                 onchange="handleFolderSelected(this.files)" />
-              <a href="javascript:void(0)" id="link-custom-path" onclick="openPathFromLaunch()" style="
-                    font-size: 11.5px;
-                    color: var(--accent);
-                    text-decoration: none;
-                  ">
-                📝 Or enter a custom file path…
-              </a>
             </div>
           </div>
 
