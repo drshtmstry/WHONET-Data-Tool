@@ -22,6 +22,33 @@ Use the tool directly in your browser without any installation:
 > - **Data Quality Dependency**: Generated surveillance statistics, counts, and monthly breakdown tables depend directly on the quality, completeness, and standardization of data entered in your WHONET laboratory records (e.g., organism codes, specimen types, ward designations).
 > - **Mandatory Verification**: All generated figures and tables must be **verified manually by qualified laboratory personnel / microbiologists** before submitting to any state, national, or organizational surveillance bodies (such as SAPCAR-Gujarat, ICMR, or national AMR containment programs).
 
+## 🖥️ Standalone Windows App
+
+For editing WHONET databases directly on a laboratory computer, use the portable Windows app. It runs locally and does not require internet access, Node.js, or a separate server window.
+
+### Instructions for Users
+
+1. Open the project’s **GitHub Releases** page.
+2. Download the latest `WHONET Data Tool.exe` release asset. Do not download the source-code ZIP for normal use.
+3. If Windows shows a SmartScreen message, verify that the file came from the official project release, then choose **More info** and **Run anyway**.
+4. Double-click the downloaded executable.
+5. Select a database from `C:\WHONET\Data` inside the app.
+6. Edit and save the database.
+
+The app processes data locally and does not upload WHONET records. Keep a backup of important databases before making bulk changes. The official WHONET application should be closed when modifying the same database file.
+
+## 📦 Publishing a GitHub Release
+
+After running `npm run build:desktop`, upload this file as a GitHub Release asset:
+
+```text
+desktop-dist/WHONET Data Tool 1.0.0.exe
+```
+
+Do not publish WHONET `.sqlite` files, patient data, database backups, credentials, API keys, or `node_modules`. The executable contains the application only; user databases remain on the local computer.
+
+Because the executable is not code-signed, Windows may display a SmartScreen warning on first launch. Users should verify that the file was downloaded from the project’s official GitHub Release before choosing **More info** and **Run anyway**.
+
 ---
 
 ## 📖 Overview
@@ -57,8 +84,11 @@ whonet/
 ├── src/
 │   ├── index.html          # Frontend UI with disclaimer & source modals
 │   ├── app.js              # Client logic (Hybrid: Node API + WebAssembly sql.js)
-│   └── styles.css          # Design system & dark theme
+│   ├── styles.css           # Design system & dark theme
+│   └── vendor/              # Offline SQLite WebAssembly runtime
 ├── server.js               # Zero-lock Node.js server with on-demand SQLite
+├── electron-main.cjs       # Native desktop window entry point
+├── Start-WHONET.bat        # Simple local browser launcher
 ├── package.json            # Scripts & metadata
 ├── vercel.json             # Vercel static routing configuration
 ├── README.md               # Documentation & usage instructions
@@ -69,13 +99,28 @@ whonet/
 
 ## 🚀 Getting Started
 
-Run the development server locally:
+### Standalone Desktop Build
+
+Install Node.js once, install the dependencies, and build the portable Windows app:
+
+```bash
+npm install
+npm run build:desktop
+```
+
+The executable is created at:
+
+```text
+desktop-dist/WHONET Data Tool 1.0.0.exe
+```
+
+For local browser development, run:
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:7890](http://localhost:7890) in your browser.
+Then open [http://localhost:7890](http://localhost:7890) in your browser. On Windows, `Start-WHONET.bat` starts the local server and opens the browser automatically.
 
 ---
 

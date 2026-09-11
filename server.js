@@ -8,7 +8,9 @@ import { exec } from "node:child_process";
 
 import { watch } from "node:fs";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const __dirname = process.pkg
+  ? dirname(process.execPath)
+  : dirname(fileURLToPath(import.meta.url));
 const WHONET_DIR = "C:\\WHONET\\Data";
 
 // Live-reload SSE clients
@@ -26,7 +28,7 @@ function broadcastReload() {
 
 // Watch src folder for changes to auto-reload browser
 const srcDir = join(__dirname, "src");
-if (existsSync(srcDir)) {
+if (!process.env.WHONET_NO_WATCH && existsSync(srcDir)) {
   let debounceTimer = null;
   watch(srcDir, { recursive: true }, (eventType, filename) => {
     if (
@@ -83,7 +85,7 @@ function withDb(callback) {
   } finally {
     try {
       db.close();
-    } catch (_) {}
+    } catch (_) { }
   }
 }
 
@@ -228,6 +230,22 @@ function handleRequest(req, res) {
         "Cache-Control": "public, max-age=86400",
       });
       return res.end(img);
+    }
+  }
+
+  if (path.startsWith("/vendor/")) {
+    const filename = basename(path);
+    const vendorPath = join(__dirname, "src", "vendor", filename);
+    if (existsSync(vendorPath)) {
+      const data = readFileSync(vendorPath);
+      const contentType = filename.endsWith(".wasm")
+        ? "application/wasm"
+        : "application/javascript; charset=utf-8";
+      res.writeHead(200, {
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=86400",
+      });
+      return res.end(data);
     }
   }
 
@@ -757,7 +775,7 @@ function handleRequest(req, res) {
 
         const whereSql = whereClauses.length
           ? `WHERE ${selectExpr} IS NOT NULL AND ${selectExpr} != '' AND ` +
-            whereClauses.join(" AND ")
+          whereClauses.join(" AND ")
           : `WHERE ${selectExpr} IS NOT NULL AND ${selectExpr} != ''`;
 
         const querySql = `
@@ -1024,17 +1042,18 @@ function handleRequest(req, res) {
 }
 
 function openBrowser(url) {
+  if (process.env.WHONET_NO_BROWSER === "1") return;
   try {
     if (process.platform === "win32") {
       exec(`cmd.exe /c start "" "${url}"`, (err) => {
         if (err) {
-          exec(`powershell.exe -Command "Start-Process '${url}'"`, () => {});
+          exec(`powershell.exe -Command "Start-Process '${url}'"`, () => { });
         }
       });
     } else if (process.platform === "darwin") {
-      exec(`open "${url}"`, () => {});
+      exec(`open "${url}"`, () => { });
     } else {
-      exec(`xdg-open "${url}"`, () => {});
+      exec(`xdg-open "${url}"`, () => { });
     }
   } catch (e) {
     console.error("Auto-open failed:", e.message);

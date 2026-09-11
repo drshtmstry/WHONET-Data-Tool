@@ -2,11 +2,13 @@
   "name": "whonet-data-tool",
   "version": "1.0.0",
   "description": "WHONET Laboratory Database Management, Deduplication & AMR Surveillance Tool",
-  "main": "server.js",
+  "main": "electron-main.cjs",
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "build:exe": "esbuild server.js --bundle --platform=node --format=cjs --outfile=server.bundle.cjs && pkg server.bundle.cjs --targets node22-win-x64 --output dist/WHONET-Data-Tool.exe && if not exist dist\\src mkdir dist\\src && xcopy /E /I /Y src dist\\src >nul && xcopy /E /I /Y public dist\\public >nul",
+    "build:desktop": "electron-builder --win portable"
   },
   "keywords": [
     "whonet",
@@ -18,5 +20,45 @@
     "data-quality"
   ],
   "author": "Dr. Darshit Mistry",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "sql.js": "^1.14.2"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.22.0",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2"
+  },
+  "bin": "server.js",
+  "pkg": {
+    "scripts": [
+      "server.js"
+    ],
+    "assets": [
+      "src/**/*",
+      "public/**/*",
+      "sample-data/**/*"
+    ]
+  },
+  "build": {
+    "appId": "org.whonet.datatool",
+    "productName": "WHONET Data Tool",
+    "directories": {
+      "output": "desktop-dist"
+    },
+    "icon": "src/dev-icon.png",
+    "asar": true,
+    "files": [
+      "electron-main.cjs",
+      "server.js",
+      "src/**/*",
+      "public/**/*",
+      "sample-data/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable"
+    }
+  }
 }

@@ -1,647 +1,412 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WHONET Data Tool — BMCRI</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="styles.css" />
-    <!-- sql.js WASM for 100% in-browser offline / web client support -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.12.0/sql-wasm.js"></script>
-    <!-- Chart.js for dynamic surveillance analytics -->
-    <script
-      src="/chart.umd.min.js"
-      onerror="
-        this.onerror = null;
-        this.src =
-          'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
-      "
-    ></script>
-  </head>
 
-  <body>
-    <!-- Header -->
-    <header class="header">
-      <div class="header-logo">
-        <img
-          src="/whonet-logo.png"
-          onerror="
-            this.onerror = null;
-            this.src = 'https://whonet.org/img/WHONET_Logo_transparentbg.png';
-          "
-          alt="WHONET Logo"
-        />
-        <div>
-          <div class="header-title">WHONET Data Tool</div>
-          <div class="header-sub">
-            Laboratory Database Management &amp; Deduplication
-          </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WHONET Data Tool — BMCRI</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- sql.js WASM for 100% in-browser offline / web client support -->
+  <script src="vendor/sql-wasm.js"></script>
+  <!-- Chart.js for dynamic surveillance analytics -->
+  <script src="/chart.umd.min.js" onerror="
+        this.onerror = null;
+        this.src = '/chart.umd.min.js';
+      "></script>
+</head>
+
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-logo">
+      <img src="/whonet-logo.png" alt="WHONET Logo" />
+      <div>
+        <div class="header-title">WHONET Data Tool</div>
+        <div class="header-sub">
+          Laboratory Database Management &amp; Deduplication
         </div>
       </div>
-      <div class="db-selector" id="db-selector">
-        <span
-          id="runtime-badge"
-          class="badge"
-          style="
+    </div>
+    <div class="db-selector" id="db-selector">
+      <span id="runtime-badge" class="badge" style="
             background: rgba(255, 255, 255, 0.08);
             color: var(--text2);
             font-size: 11px;
             padding: 4px 8px;
-          "
-          >Connecting…</span
-        >
-        <label for="db-select" id="db-select-label">📂 Database</label>
-        <select
-          class="db-select"
-          id="db-select"
-          onchange="switchDb(this.value)"
-        >
-          <option value="">Loading…</option>
-        </select>
-        <button
-          class="btn btn-sm btn-success"
-          id="btn-save-file"
-          onclick="saveToFileHandle()"
-          title="Save changes directly back to the original .sqlite file on disk"
-          style="display: none; padding: 5px 10px; font-size: 12px"
-        >
-          💾 Save to File
-        </button>
-        <button
-          class="btn btn-sm btn-outline"
-          id="btn-download-db"
-          onclick="exportSqliteDatabase()"
-          title="Download / Export modified .sqlite file to your computer"
-          style="display: none; padding: 5px 10px; font-size: 12px; color: #fff; border-color: rgba(255,255,255,0.2)"
-        >
-          ⬇️ Export .sqlite
-        </button>
-        <input
-          type="file"
-          id="file-upload-input"
-          accept=".sqlite"
-          style="display: none"
-          onchange="handleFileUpload(this.files[0])"
-        />
+          ">Connecting…</span>
+      <label for="db-select" id="db-select-label">📂 Database</label>
+      <select class="db-select" id="db-select" onchange="switchDb(this.value)">
+        <option value="">Loading…</option>
+      </select>
+      <button class="btn btn-sm btn-success" id="btn-save-file" onclick="saveToFileHandle()"
+        title="Save changes directly back to the original .sqlite file on disk"
+        style="display: none; padding: 5px 10px; font-size: 12px">
+        💾 Save to File
+      </button>
+      <button class="btn btn-sm btn-outline" id="btn-download-db" onclick="exportSqliteDatabase()"
+        title="Download / Export modified .sqlite file to your computer"
+        style="display: none; padding: 5px 10px; font-size: 12px; color: #fff; border-color: rgba(255,255,255,0.2)">
+        ⬇️ Export .sqlite
+      </button>
+      <input type="file" id="file-upload-input" accept=".sqlite" style="display: none"
+        onchange="handleFileUpload(this.files[0])" />
+    </div>
+  </header>
+
+  <!-- Layout -->
+  <div class="layout">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="nav-section">Overview</div>
+      <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M2 2h5v5H2V2zm7 0h5v5H9V2zM2 9h5v5H2V9zm7 0h5v5H9V9z" opacity=".7" />
+        </svg>
+        Dashboard
       </div>
-    </header>
 
-    <!-- Layout -->
-    <div class="layout">
-      <!-- Sidebar -->
-      <nav class="sidebar">
-        <div class="nav-section">Overview</div>
-        <div
-          class="nav-item active"
-          onclick="showPage('dashboard')"
-          id="nav-dashboard"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path
-              d="M2 2h5v5H2V2zm7 0h5v5H9V2zM2 9h5v5H2V9zm7 0h5v5H9V9z"
-              opacity=".7"
-            />
-          </svg>
-          Dashboard
-        </div>
+      <div class="nav-section">Data</div>
+      <div class="nav-item" onclick="showPage('isolates')" id="nav-isolates">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="1" y="3" width="14" height="10" rx="1.5" />
+          <line x1="1" y1="6" x2="15" y2="6" />
+          <line x1="5" y1="6" x2="5" y2="13" />
+        </svg>
+        All Isolates
+      </div>
+      <div class="nav-item" onclick="showPage('duplicates')" id="nav-duplicates">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="1" y="4" width="11" height="10" rx="1.5" />
+          <rect x="4" y="2" width="11" height="10" rx="1.5" stroke-dasharray="2 1" />
+        </svg>
+        Duplicates
+        <span class="nav-badge" id="dup-badge">—</span>
+      </div>
+      <div class="nav-item" onclick="showPage('monthly-amr')" id="nav-monthly-amr">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="2" width="12" height="12" rx="2" />
+          <line x1="2" y1="5" x2="14" y2="5" />
+          <line x1="6" y1="2" x2="6" y2="5" />
+          <line x1="10" y1="2" x2="10" y2="5" />
+          <circle cx="5" cy="8" r="0.8" fill="currentColor" />
+          <circle cx="8" cy="8" r="0.8" fill="currentColor" />
+          <circle cx="11" cy="8" r="0.8" fill="currentColor" />
+          <circle cx="5" cy="11" r="0.8" fill="currentColor" />
+          <circle cx="8" cy="11" r="0.8" fill="currentColor" />
+        </svg>
+        Monthly AMR Report
+      </div>
 
-        <div class="nav-section">Data</div>
-        <div class="nav-item" onclick="showPage('isolates')" id="nav-isolates">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-          >
-            <rect x="1" y="3" width="14" height="10" rx="1.5" />
-            <line x1="1" y1="6" x2="15" y2="6" />
-            <line x1="5" y1="6" x2="5" y2="13" />
-          </svg>
-          All Isolates
-        </div>
-        <div
-          class="nav-item"
-          onclick="showPage('duplicates')"
-          id="nav-duplicates"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-          >
-            <rect x="1" y="4" width="11" height="10" rx="1.5" />
-            <rect
-              x="4"
-              y="2"
-              width="11"
-              height="10"
-              rx="1.5"
-              stroke-dasharray="2 1"
-            />
-          </svg>
-          Duplicates
-          <span class="nav-badge" id="dup-badge">—</span>
-        </div>
-        <div
-          class="nav-item"
-          onclick="showPage('monthly-amr')"
-          id="nav-monthly-amr"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-          >
-            <rect x="2" y="2" width="12" height="12" rx="2" />
-            <line x1="2" y1="5" x2="14" y2="5" />
-            <line x1="6" y1="2" x2="6" y2="5" />
-            <line x1="10" y1="2" x2="10" y2="5" />
-            <circle cx="5" cy="8" r="0.8" fill="currentColor" />
-            <circle cx="8" cy="8" r="0.8" fill="currentColor" />
-            <circle cx="11" cy="8" r="0.8" fill="currentColor" />
-            <circle cx="5" cy="11" r="0.8" fill="currentColor" />
-            <circle cx="8" cy="11" r="0.8" fill="currentColor" />
-          </svg>
-          Monthly AMR Report
-        </div>
-
-        <div class="nav-section">Corrections</div>
-        <div class="nav-item" onclick="showPage('fixes')" id="nav-fixes">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-          >
-            <path d="M2 8h12M10 4l4 4-4 4" />
-          </svg>
-          Bulk Fixes
-        </div>
-        <div class="nav-item" onclick="showPage('sql')" id="nav-sql">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-          >
-            <polyline points="4,6 2,8 4,10" />
-            <polyline points="12,6 14,8 12,10" />
-            <line x1="9" y1="4" x2="7" y2="12" />
-          </svg>
-          SQL Editor
-        </div>
-        <div class="sidebar-footer">
-          <div
-            style="
+      <div class="nav-section">Corrections</div>
+      <div class="nav-item" onclick="showPage('fixes')" id="nav-fixes">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M2 8h12M10 4l4 4-4 4" />
+        </svg>
+        Bulk Fixes
+      </div>
+      <div class="nav-item" onclick="showPage('sql')" id="nav-sql">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <polyline points="4,6 2,8 4,10" />
+          <polyline points="12,6 14,8 12,10" />
+          <line x1="9" y1="4" x2="7" y2="12" />
+        </svg>
+        SQL Editor
+      </div>
+      <div class="sidebar-footer">
+        <div style="
               margin-bottom: 8px;
               padding-bottom: 8px;
               border-bottom: 1px solid rgba(255, 255, 255, 0.08);
               font-size: 10px;
               line-height: 1.4;
               color: rgba(255, 255, 255, 0.5);
-            "
-          >
-            WHONET is property of the
-            <a
-              href="https://whonet.org/about.html"
-              target="_blank"
-              rel="noopener noreferrer"
-              >WHO Collaborating Centre for Surveillance of Antimicrobial
-              Resistance</a
-            >
-            (Brigham &amp; Women's Hospital / Harvard Medical School).<br />
-            <span style="display: inline-block; margin-top: 4px"
-              >Copyright © WHONET 1989–2026.</span
-            >
-          </div>
-          <div style="margin-top: 10px">
-            <div
-              style="
+            ">
+          WHONET is property of the
+          <a href="https://whonet.org/about.html" target="_blank" rel="noopener noreferrer">WHO Collaborating Centre for
+            Surveillance of Antimicrobial
+            Resistance</a>
+          (Brigham &amp; Women's Hospital / Harvard Medical School).<br />
+          <span style="display: inline-block; margin-top: 4px">Copyright © WHONET 1989–2026.</span>
+        </div>
+        <div style="margin-top: 10px">
+          <div style="
                 font-size: 10.5px;
                 text-transform: uppercase;
                 letter-spacing: 0.6px;
                 font-weight: 600;
                 color: rgba(255, 255, 255, 0.4);
                 margin-bottom: 6px;
-              "
-            >
-              Developed by
-            </div>
-            <a
-              class="dev-pill"
-              href="https://drshtmstry.github.io/"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Visit Dr. Darshit Mistry's portfolio"
-            >
-              <img
-                src="/dev-icon.ico"
-                class="dev-pill-icon"
-                alt="DM"
-                onerror="this.src = '/dev-icon.png'"
-              />
-              <span class="dev-pill-name">Dr. Darshit Mistry</span>
-            </a>
+              ">
+            Developed by
           </div>
-          <div
-            style="
+          <a class="dev-pill" href="https://drshtmstry.github.io/" target="_blank" rel="noopener noreferrer"
+            title="Visit Dr. Darshit Mistry's portfolio">
+            <img src="/dev-icon.ico" class="dev-pill-icon" alt="DM" onerror="this.src = '/dev-icon.png'" />
+            <span class="dev-pill-name">Dr. Darshit Mistry</span>
+          </a>
+        </div>
+        <div style="
               font-size: 10px;
               color: rgba(255, 255, 255, 0.4);
               margin-top: 6px;
-            "
-          >
-            Free open-source community utility.
-          </div>
+            ">
+          Free open-source community utility.
         </div>
-      </nav>
+      </div>
+    </nav>
 
-      <!-- Main -->
-      <main class="main">
-        <!-- Dashboard -->
-        <div class="page active" id="page-dashboard">
-          <!-- Drag & drop / custom path banner -->
-          <div
-            class="db-dropzone"
-            id="global-dropzone"
-            ondragover="
+    <!-- Main -->
+    <main class="main">
+      <!-- Dashboard -->
+      <div class="page active" id="page-dashboard">
+        <!-- Drag & drop / custom path banner -->
+        <div class="db-dropzone" id="global-dropzone" ondragover="
               event.preventDefault();
               this.classList.add('dragover');
-            "
-            ondragleave="this.classList.remove('dragover')"
-            ondrop="handleFileDrop(event)"
-          >
-            <div class="db-dropzone-title">
-              <span>📥</span> Drag &amp; Drop any WHONET
-              <code>.sqlite</code> file here, or click to upload
-            </div>
-            <div class="db-dropzone-sub">
-              Works with standard WHONET files from
-              <code>C:\WHONET\Data</code> or custom folders/downloads.
-            </div>
-            <div class="db-source-tabs" onclick="event.stopPropagation()">
-              <button
-                class="btn btn-sm btn-primary"
-                onclick="document.getElementById('file-upload-input').click()"
-              >
-                ⬆ Choose SQLite File
-              </button>
-              <button
-                class="btn btn-sm btn-ghost"
-                onclick="openPathPrompt()"
-                id="dropzone-btn-path"
-              >
-                📂 Open Local Path…
-              </button>
-              <button
-                class="btn btn-sm btn-ghost"
-                onclick="loadSampleDatabase('WHO-TST-2020-01.sqlite')"
-                title="Load bundled sample dataset"
-              >
-                🧪 WHO-TST-2020-01
-              </button>
-              <button
-                class="btn btn-sm btn-ghost"
-                onclick="loadSampleDatabase('WHO-TST-2020-OneHealth.sqlite')"
-                title="Load bundled sample dataset"
-              >
-                🌐 WHO-TST OneHealth
-              </button>
-            </div>
+            " ondragleave="this.classList.remove('dragover')" ondrop="handleFileDrop(event)">
+          <div class="db-dropzone-title">
+            <span>📥</span> Drag &amp; Drop any WHONET
+            <code>.sqlite</code> file here, or click to upload
           </div>
-
-          <div class="section-header">
-            <div>
-              <div class="section-title">📊 Overview</div>
-              <div class="section-sub" id="db-label">No database loaded</div>
-            </div>
-            <button class="btn btn-ghost btn-sm" onclick="loadStats()">
-              ↺ Refresh
+          <div class="db-dropzone-sub">
+            Works with standard WHONET files from
+            <code>C:\WHONET\Data</code> or custom folders/downloads.
+          </div>
+          <div class="db-source-tabs" onclick="event.stopPropagation()">
+            <button class="btn btn-sm btn-primary" onclick="document.getElementById('file-upload-input').click()">
+              ⬆ Choose SQLite File
+            </button>
+            <button class="btn btn-sm btn-ghost" onclick="openPathPrompt()" id="dropzone-btn-path">
+              📂 Open Local Path…
+            </button>
+            <button class="btn btn-sm btn-ghost" onclick="loadSampleDatabase('WHO-TST-2020-01.sqlite')"
+              title="Load bundled sample dataset">
+              🧪 WHO-TST-2020-01
+            </button>
+            <button class="btn btn-sm btn-ghost" onclick="loadSampleDatabase('WHO-TST-2020-OneHealth.sqlite')"
+              title="Load bundled sample dataset">
+              🌐 WHO-TST OneHealth
             </button>
           </div>
-          <div class="stats-grid" id="stats-grid">
-            <div class="stat-card">
-              <div class="stat-label">Loading…</div>
-              <div class="stat-value">—</div>
+        </div>
+
+        <div class="section-header">
+          <div>
+            <div class="section-title">📊 Overview</div>
+            <div class="section-sub" id="db-label">No database loaded</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="loadStats()">
+            ↺ Refresh
+          </button>
+        </div>
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Loading…</div>
+            <div class="stat-value">—</div>
+          </div>
+        </div>
+
+        <!-- Dynamic Visual Analytics Section -->
+        <div class="chart-analytics-card" id="chart-analytics-card">
+          <div class="chart-controls-bar">
+            <div class="chart-controls-left">
+              <div class="chart-card-title">
+                <span style="font-size: 18px">📈</span>
+                <span>Dynamic Surveillance Analytics</span>
+              </div>
+              <div class="chart-card-sub" id="chart-filtered-sub">
+                Visual distribution across selected parameters
+              </div>
+            </div>
+
+            <div class="chart-controls-right">
+              <!-- Parameter Selection -->
+              <div class="chart-control-group">
+                <label for="chart-param-select">Parameter</label>
+                <select id="chart-param-select" class="chart-filter-select" onchange="updateDashboardCharts()">
+                  <option value="ORGANISM" selected>
+                    Organism Distribution
+                  </option>
+                  <option value="SPEC_TYPE">Specimen Type (SPEC_TYPE)</option>
+                  <option value="WARD">Location (WARD)</option>
+                  <option value="WARD_TYPE">Location Type (WARD_TYPE)</option>
+                  <option value="DEPARTMENT">Department</option>
+                  <option value="SEX">Gender</option>
+                  <option value="AGE_GROUP">Age Demographics</option>
+                  <option value="ESBL">ESBL Status</option>
+                  <option value="CARBAPENEM">Carbapenem Resistance</option>
+                  <option value="MRSA">MRSA Status</option>
+                </select>
+              </div>
+
+              <!-- Period / Range Filter -->
+              <div class="chart-control-group">
+                <label for="chart-period-select">Period / Range</label>
+                <select id="chart-period-select" class="chart-filter-select" onchange="onPeriodFilterChange()">
+                  <option value="all" selected>All Time</option>
+                  <option value="3m">Last 3 Months</option>
+                  <option value="6m">Last 6 Months</option>
+                  <option value="12m">Last 12 Months</option>
+                  <option value="custom">Custom Date Range…</option>
+                </select>
+              </div>
+
+              <!-- Custom Date Range Inputs (hidden by default) -->
+              <div class="chart-control-group" id="chart-custom-dates" style="display: none">
+                <label>Date Range</label>
+                <div style="display: flex; gap: 6px; align-items: center">
+                  <input type="date" id="chart-date-start" class="chart-date-input"
+                    onchange="updateDashboardCharts()" />
+                  <span style="color: var(--text3); font-size: 11px">to</span>
+                  <input type="date" id="chart-date-end" class="chart-date-input" onchange="updateDashboardCharts()" />
+                </div>
+              </div>
+
+              <!-- Chart Type Toggle -->
+              <div class="chart-control-group">
+                <label>Chart Style</label>
+                <div class="chart-type-toggle">
+                  <button type="button" class="btn-toggle-type active" id="btn-chart-both"
+                    onclick="setChartTypeMode('both')" title="Show both Bar & Pie charts">
+                    📊 &amp; 🥧
+                  </button>
+                  <button type="button" class="btn-toggle-type" id="btn-chart-bar" onclick="setChartTypeMode('bar')"
+                    title="Show Bar Chart only">
+                    📊 Bar
+                  </button>
+                  <button type="button" class="btn-toggle-type" id="btn-chart-pie" onclick="setChartTypeMode('pie')"
+                    title="Show Doughnut/Pie only">
+                    🥧 Pie
+                  </button>
+                </div>
+              </div>
+
+              <button class="btn btn-ghost btn-sm" onclick="updateDashboardCharts()" title="Refresh chart data"
+                style="align-self: flex-end; height: 34px">
+                🔄
+              </button>
             </div>
           </div>
 
-          <!-- Dynamic Visual Analytics Section -->
-          <div class="chart-analytics-card" id="chart-analytics-card">
-            <div class="chart-controls-bar">
-              <div class="chart-controls-left">
-                <div class="chart-card-title">
-                  <span style="font-size: 18px">📈</span>
-                  <span>Dynamic Surveillance Analytics</span>
+          <!-- Charts Display Grid -->
+          <div class="charts-view-grid" id="charts-view-grid">
+            <!-- Bar Chart Card -->
+            <div class="chart-box" id="chart-box-bar">
+              <div class="chart-box-header">
+                <div class="chart-box-title" id="bar-chart-title">
+                  📊 Frequency Breakdown (Top Counts)
                 </div>
-                <div class="chart-card-sub" id="chart-filtered-sub">
-                  Visual distribution across selected parameters
+                <div class="chart-box-actions">
+                  <button class="btn btn-ghost btn-xs" onclick="resetChartZoom('bar')">
+                    Reset View
+                  </button>
                 </div>
               </div>
-
-              <div class="chart-controls-right">
-                <!-- Parameter Selection -->
-                <div class="chart-control-group">
-                  <label for="chart-param-select">Parameter</label>
-                  <select
-                    id="chart-param-select"
-                    class="chart-filter-select"
-                    onchange="updateDashboardCharts()"
-                  >
-                    <option value="ORGANISM" selected>
-                      Organism Distribution
-                    </option>
-                    <option value="SPEC_TYPE">Specimen Type (SPEC_TYPE)</option>
-                    <option value="WARD">Location (WARD)</option>
-                    <option value="WARD_TYPE">Location Type (WARD_TYPE)</option>
-                    <option value="DEPARTMENT">Department</option>
-                    <option value="SEX">Gender</option>
-                    <option value="AGE_GROUP">Age Demographics</option>
-                    <option value="ESBL">ESBL Status</option>
-                    <option value="CARBAPENEM">Carbapenem Resistance</option>
-                    <option value="MRSA">MRSA Status</option>
-                  </select>
-                </div>
-
-                <!-- Period / Range Filter -->
-                <div class="chart-control-group">
-                  <label for="chart-period-select">Period / Range</label>
-                  <select
-                    id="chart-period-select"
-                    class="chart-filter-select"
-                    onchange="onPeriodFilterChange()"
-                  >
-                    <option value="all" selected>All Time</option>
-                    <option value="3m">Last 3 Months</option>
-                    <option value="6m">Last 6 Months</option>
-                    <option value="12m">Last 12 Months</option>
-                    <option value="custom">Custom Date Range…</option>
-                  </select>
-                </div>
-
-                <!-- Custom Date Range Inputs (hidden by default) -->
-                <div
-                  class="chart-control-group"
-                  id="chart-custom-dates"
-                  style="display: none"
-                >
-                  <label>Date Range</label>
-                  <div style="display: flex; gap: 6px; align-items: center">
-                    <input
-                      type="date"
-                      id="chart-date-start"
-                      class="chart-date-input"
-                      onchange="updateDashboardCharts()"
-                    />
-                    <span style="color: var(--text3); font-size: 11px">to</span>
-                    <input
-                      type="date"
-                      id="chart-date-end"
-                      class="chart-date-input"
-                      onchange="updateDashboardCharts()"
-                    />
-                  </div>
-                </div>
-
-                <!-- Chart Type Toggle -->
-                <div class="chart-control-group">
-                  <label>Chart Style</label>
-                  <div class="chart-type-toggle">
-                    <button
-                      type="button"
-                      class="btn-toggle-type active"
-                      id="btn-chart-both"
-                      onclick="setChartTypeMode('both')"
-                      title="Show both Bar & Pie charts"
-                    >
-                      📊 &amp; 🥧
-                    </button>
-                    <button
-                      type="button"
-                      class="btn-toggle-type"
-                      id="btn-chart-bar"
-                      onclick="setChartTypeMode('bar')"
-                      title="Show Bar Chart only"
-                    >
-                      📊 Bar
-                    </button>
-                    <button
-                      type="button"
-                      class="btn-toggle-type"
-                      id="btn-chart-pie"
-                      onclick="setChartTypeMode('pie')"
-                      title="Show Doughnut/Pie only"
-                    >
-                      🥧 Pie
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  class="btn btn-ghost btn-sm"
-                  onclick="updateDashboardCharts()"
-                  title="Refresh chart data"
-                  style="align-self: flex-end; height: 34px"
-                >
-                  🔄
-                </button>
+              <div class="chart-canvas-container">
+                <canvas id="dashboard-bar-chart"></canvas>
               </div>
             </div>
 
-            <!-- Charts Display Grid -->
-            <div class="charts-view-grid" id="charts-view-grid">
-              <!-- Bar Chart Card -->
-              <div class="chart-box" id="chart-box-bar">
-                <div class="chart-box-header">
-                  <div class="chart-box-title" id="bar-chart-title">
-                    📊 Frequency Breakdown (Top Counts)
-                  </div>
-                  <div class="chart-box-actions">
-                    <button
-                      class="btn btn-ghost btn-xs"
-                      onclick="resetChartZoom('bar')"
-                    >
-                      Reset View
-                    </button>
-                  </div>
+            <!-- Pie / Doughnut Chart Card -->
+            <div class="chart-box" id="chart-box-pie">
+              <div class="chart-box-header">
+                <div class="chart-box-title" id="pie-chart-title">
+                  🥧 Proportion &amp; Share (%)
                 </div>
-                <div class="chart-canvas-container">
-                  <canvas id="dashboard-bar-chart"></canvas>
-                </div>
-              </div>
-
-              <!-- Pie / Doughnut Chart Card -->
-              <div class="chart-box" id="chart-box-pie">
-                <div class="chart-box-header">
-                  <div class="chart-box-title" id="pie-chart-title">
-                    🥧 Proportion &amp; Share (%)
-                  </div>
-                  <div class="chart-box-actions">
-                    <span
-                      class="badge"
-                      id="pie-total-badge"
-                      style="
+                <div class="chart-box-actions">
+                  <span class="badge" id="pie-total-badge" style="
                         background: var(--bg3);
                         color: var(--text2);
                         font-size: 11px;
-                      "
-                      >0 records</span
-                    >
-                  </div>
+                      ">0 records</span>
                 </div>
-                <div class="chart-canvas-container">
-                  <canvas id="dashboard-pie-chart"></canvas>
-                </div>
+              </div>
+              <div class="chart-canvas-container">
+                <canvas id="dashboard-pie-chart"></canvas>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- All Isolates -->
-        <div class="page" id="page-isolates">
-          <div class="section-header">
-            <div>
-              <div class="section-title">🔬 All Isolates</div>
-              <div class="section-sub" id="isolates-count">Loading…</div>
-            </div>
-          </div>
-          <div class="table-wrap">
-            <div class="table-toolbar">
-              <div class="search-box">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="#64748b"
-                  stroke-width="2"
-                >
-                  <circle cx="7" cy="7" r="5" />
-                  <line x1="10.5" y1="10.5" x2="14" y2="14" />
-                </svg>
-                <input
-                  type="text"
-                  id="isolates-search"
-                  placeholder="Search by Specimen #, Patient ID, Name…"
-                  oninput="debouncedLoadIsolates()"
-                />
-              </div>
-              <select
-                class="filter-select"
-                id="isolates-org-filter"
-                onchange="loadIsolates(1)"
-              >
-                <option value="">All Organisms</option>
-              </select>
-              <select
-                class="filter-select"
-                id="isolates-ward-filter"
-                onchange="loadIsolates(1)"
-              >
-                <option value="">All Wards</option>
-              </select>
-            </div>
-            <div id="isolates-table-body">
-              <div class="loading">
-                <div class="spinner"></div>
-                Loading isolates…
-              </div>
-            </div>
-            <div class="pagination" id="isolates-pagination"></div>
+      <!-- All Isolates -->
+      <div class="page" id="page-isolates">
+        <div class="section-header">
+          <div>
+            <div class="section-title">🔬 All Isolates</div>
+            <div class="section-sub" id="isolates-count">Loading…</div>
           </div>
         </div>
-
-        <!-- Duplicates -->
-        <div class="page" id="page-duplicates">
-          <div class="section-header">
-            <div>
-              <div class="section-title">⚠️ Duplicate Records</div>
-              <div class="section-sub" id="dup-count">
-                Grouped by Specimen ID (case-insensitive)
-              </div>
+        <div class="table-wrap">
+          <div class="table-toolbar">
+            <div class="search-box">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#64748b" stroke-width="2">
+                <circle cx="7" cy="7" r="5" />
+                <line x1="10.5" y1="10.5" x2="14" y2="14" />
+              </svg>
+              <input type="text" id="isolates-search" placeholder="Search by Specimen #, Patient ID, Name…"
+                oninput="debouncedLoadIsolates()" />
             </div>
-            <div
-              style="
+            <select class="filter-select" id="isolates-org-filter" onchange="loadIsolates(1)">
+              <option value="">All Organisms</option>
+            </select>
+            <select class="filter-select" id="isolates-ward-filter" onchange="loadIsolates(1)">
+              <option value="">All Wards</option>
+            </select>
+          </div>
+          <div id="isolates-table-body">
+            <div class="loading">
+              <div class="spinner"></div>
+              Loading isolates…
+            </div>
+          </div>
+          <div class="pagination" id="isolates-pagination"></div>
+        </div>
+      </div>
+
+      <!-- Duplicates -->
+      <div class="page" id="page-duplicates">
+        <div class="section-header">
+          <div>
+            <div class="section-title">⚠️ Duplicate Records</div>
+            <div class="section-sub" id="dup-count">
+              Grouped by Specimen ID (case-insensitive)
+            </div>
+          </div>
+          <div style="
                 display: flex;
                 align-items: center;
                 gap: 12px;
                 margin-left: auto;
-              "
-            >
-              <div class="seg-control" id="dup-mode-toggle">
-                <button
-                  class="seg-btn active"
-                  id="mode-btn-spec"
-                  onclick="setDupMode('spec')"
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                  >
-                    <rect x="2" y="2" width="12" height="12" rx="2" />
-                    <line x1="2" y1="6" x2="14" y2="6" />
-                  </svg>
-                  By Specimen ID
-                </button>
-                <button
-                  class="seg-btn"
-                  id="mode-btn-patient"
-                  onclick="setDupMode('patient')"
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                  >
-                    <path d="M8 8a3 3 0 100-6 3 3 0 000 6zM2 14a6 6 0 0112 0" />
-                  </svg>
-                  By Patient ID
-                </button>
-              </div>
-              <button class="btn btn-danger" onclick="confirmDeleteAllDups()">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                >
-                  <polyline points="2,4 14,4" />
-                  <path d="M5,4V2h6v2M6,7v5M10,7v5" />
-                  <path d="M3,4l1,10h8l1-10" />
+              ">
+            <div class="seg-control" id="dup-mode-toggle">
+              <button class="seg-btn active" id="mode-btn-spec" onclick="setDupMode('spec')">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <rect x="2" y="2" width="12" height="12" rx="2" />
+                  <line x1="2" y1="6" x2="14" y2="6" />
                 </svg>
-                Delete All Duplicates (Keep First)
+                By Specimen ID
+              </button>
+              <button class="seg-btn" id="mode-btn-patient" onclick="setDupMode('patient')">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M8 8a3 3 0 100-6 3 3 0 000 6zM2 14a6 6 0 0112 0" />
+                </svg>
+                By Patient ID
               </button>
             </div>
+            <button class="btn btn-danger" onclick="confirmDeleteAllDups()">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                <polyline points="2,4 14,4" />
+                <path d="M5,4V2h6v2M6,7v5M10,7v5" />
+                <path d="M3,4l1,10h8l1-10" />
+              </svg>
+              Delete All Duplicates (Keep First)
+            </button>
           </div>
+        </div>
 
-          <!-- Casing fix notice banner -->
-          <div
-            id="casing-banner"
-            style="
+        <!-- Casing fix notice banner -->
+        <div id="casing-banner" style="
               display: none;
               background: rgba(245, 158, 11, 0.08);
               border: 1px solid rgba(245, 158, 11, 0.3);
@@ -651,24 +416,15 @@
               display: flex;
               align-items: center;
               gap: 12px;
-            "
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="#f59e0b"
-              stroke-width="1.8"
-            >
-              <circle cx="8" cy="8" r="7" />
-              <line x1="8" y1="5" x2="8" y2="8.5" />
-              <circle cx="8" cy="11" r=".8" fill="#f59e0b" stroke="none" />
-            </svg>
-            <div style="flex: 1; font-size: 13px; color: #fcd34d">
-              <strong>Mixed-case SPEC_NUMs detected</strong> — e.g.
-              <code
-                style="
+            ">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="#f59e0b" stroke-width="1.8">
+            <circle cx="8" cy="8" r="7" />
+            <line x1="8" y1="5" x2="8" y2="8.5" />
+            <circle cx="8" cy="11" r=".8" fill="#f59e0b" stroke="none" />
+          </svg>
+          <div style="flex: 1; font-size: 13px; color: #fcd34d">
+            <strong>Mixed-case SPEC_NUMs detected</strong> — e.g.
+            <code style="
                   font-family:
                     JetBrains Mono,
                     monospace;
@@ -676,12 +432,9 @@
                   background: rgba(0, 0, 0, 0.3);
                   padding: 1px 5px;
                   border-radius: 3px;
-                "
-                >csbl-135</code
-              >
-              ≠
-              <code
-                style="
+                ">csbl-135</code>
+            ≠
+            <code style="
                   font-family:
                     JetBrains Mono,
                     monospace;
@@ -689,399 +442,314 @@
                   background: rgba(0, 0, 0, 0.3);
                   padding: 1px 5px;
                   border-radius: 3px;
-                "
-                >CSBL-135</code
-              >. Normalize first for accurate duplicate detection.
-            </div>
-            <button
-              class="btn btn-sm"
-              onclick="fixCasingAndRefresh()"
-              style="
+                ">CSBL-135</code>. Normalize first for accurate duplicate detection.
+          </div>
+          <button class="btn btn-sm" onclick="fixCasingAndRefresh()" style="
                 background: rgba(245, 158, 11, 0.2);
                 border: 1px solid rgba(245, 158, 11, 0.4);
                 color: #fcd34d;
                 font-weight: 700;
                 white-space: nowrap;
-              "
-            >
-              ⚡ UPPER(SPEC_NUM)
+              ">
+            ⚡ UPPER(SPEC_NUM)
+          </button>
+        </div>
+
+        <div class="table-wrap">
+          <div class="table-toolbar">
+            <div class="search-box">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#64748b" stroke-width="2">
+                <circle cx="7" cy="7" r="5" />
+                <line x1="10.5" y1="10.5" x2="14" y2="14" />
+              </svg>
+              <input type="text" id="dup-search" placeholder="Search by Specimen #…" oninput="debouncedLoadDups()" />
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="fixCasingAndRefresh()"
+              title="UPDATE Isolates SET SPEC_NUM = UPPER(SPEC_NUM)">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M3 8c0-2.8 2.2-5 5-5s5 2.2 5 5-2.2 5-5 5" />
+                <path d="M3 8l2-2M3 8l2 2" />
+              </svg>
+              Fix Casing
             </button>
           </div>
-
-          <div class="table-wrap">
-            <div class="table-toolbar">
-              <div class="search-box">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="#64748b"
-                  stroke-width="2"
-                >
-                  <circle cx="7" cy="7" r="5" />
-                  <line x1="10.5" y1="10.5" x2="14" y2="14" />
-                </svg>
-                <input
-                  type="text"
-                  id="dup-search"
-                  placeholder="Search by Specimen #…"
-                  oninput="debouncedLoadDups()"
-                />
-              </div>
-              <button
-                class="btn btn-ghost btn-sm"
-                onclick="fixCasingAndRefresh()"
-                title="UPDATE Isolates SET SPEC_NUM = UPPER(SPEC_NUM)"
-              >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                >
-                  <path d="M3 8c0-2.8 2.2-5 5-5s5 2.2 5 5-2.2 5-5 5" />
-                  <path d="M3 8l2-2M3 8l2 2" />
-                </svg>
-                Fix Casing
-              </button>
+          <div id="dup-table-body">
+            <div class="loading">
+              <div class="spinner"></div>
+              Loading duplicates…
             </div>
-            <div id="dup-table-body">
-              <div class="loading">
-                <div class="spinner"></div>
-                Loading duplicates…
-              </div>
-            </div>
-            <div class="pagination" id="dup-pagination"></div>
           </div>
+          <div class="pagination" id="dup-pagination"></div>
         </div>
+      </div>
 
-        <!-- Bulk Fixes -->
-        <div class="page" id="page-fixes">
-          <div class="section-header">
-            <div>
-              <div class="section-title">🔧 Bulk Data Corrections</div>
-              <div class="section-sub">
-                Apply standardized fixes across all records
-              </div>
-            </div>
-          </div>
-          <div class="fix-grid">
-            <div class="fix-card">
-              <div class="fix-title">SPEC_NUM → Uppercase</div>
-              <div class="fix-desc">
-                Normalize all specimen numbers to uppercase to prevent
-                case-sensitive duplicate mismatches.
-              </div>
-              <div class="fix-sql">
-                UPDATE Isolates SET SPEC_NUM = UPPER(SPEC_NUM)
-              </div>
-              <button
-                class="btn btn-primary btn-sm"
-                onclick="bulkFix('upper_spec_num')"
-              >
-                Apply Fix
-              </button>
-            </div>
-            <div class="fix-card">
-              <div class="fix-title">PATIENT_ID → Uppercase</div>
-              <div class="fix-desc">
-                Normalize Patient IDs to uppercase for consistent lookups and
-                deduplication.
-              </div>
-              <div class="fix-sql">
-                UPDATE Isolates SET PATIENT_ID = UPPER(PATIENT_ID)
-              </div>
-              <button
-                class="btn btn-primary btn-sm"
-                onclick="bulkFix('upper_patient_id')"
-              >
-                Apply Fix
-              </button>
-            </div>
-            <div class="fix-card">
-              <div class="fix-title">Trim Whitespace</div>
-              <div class="fix-desc">
-                Remove leading/trailing spaces from SPEC_NUM, PATIENT_ID,
-                FULL_NAME, WARD, and DEPARTMENT.
-              </div>
-              <div class="fix-sql">UPDATE Isolates SET field = TRIM(field)</div>
-              <button
-                class="btn btn-primary btn-sm"
-                onclick="bulkFix('trim_all')"
-              >
-                Apply Fix
-              </button>
-            </div>
-            <div class="fix-card">
-              <div class="fix-title">ORGANISM → Lowercase</div>
-              <div class="fix-desc">
-                Standardize organism codes to lowercase as used in WHONET code
-                lists.
-              </div>
-              <div class="fix-sql">
-                UPDATE Isolates SET ORGANISM = LOWER(ORGANISM)
-              </div>
-              <button
-                class="btn btn-primary btn-sm"
-                onclick="bulkFix('upper_organism')"
-              >
-                Apply Fix
-              </button>
-            </div>
-          </div>
-
-          <div class="section-header" style="margin-top: 8px">
-            <div>
-              <div class="section-title" style="font-size: 15px">
-                📋 Fix History (This Session)
-              </div>
-            </div>
-          </div>
-          <div
-            id="fix-history"
-            style="display: flex; flex-direction: column; gap: 8px"
-          >
-            <div class="empty" style="padding: 24px">
-              <div class="empty-icon" style="font-size: 32px">📝</div>
-              <div class="empty-title">No fixes applied yet</div>
+      <!-- Bulk Fixes -->
+      <div class="page" id="page-fixes">
+        <div class="section-header">
+          <div>
+            <div class="section-title">🔧 Bulk Data Corrections</div>
+            <div class="section-sub">
+              Apply standardized fixes across all records
             </div>
           </div>
         </div>
+        <div class="fix-grid">
+          <div class="fix-card">
+            <div class="fix-title">SPEC_NUM → Uppercase</div>
+            <div class="fix-desc">
+              Normalize all specimen numbers to uppercase to prevent
+              case-sensitive duplicate mismatches.
+            </div>
+            <div class="fix-sql">
+              UPDATE Isolates SET SPEC_NUM = UPPER(SPEC_NUM)
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="bulkFix('upper_spec_num')">
+              Apply Fix
+            </button>
+          </div>
+          <div class="fix-card">
+            <div class="fix-title">PATIENT_ID → Uppercase</div>
+            <div class="fix-desc">
+              Normalize Patient IDs to uppercase for consistent lookups and
+              deduplication.
+            </div>
+            <div class="fix-sql">
+              UPDATE Isolates SET PATIENT_ID = UPPER(PATIENT_ID)
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="bulkFix('upper_patient_id')">
+              Apply Fix
+            </button>
+          </div>
+          <div class="fix-card">
+            <div class="fix-title">Trim Whitespace</div>
+            <div class="fix-desc">
+              Remove leading/trailing spaces from SPEC_NUM, PATIENT_ID,
+              FULL_NAME, WARD, and DEPARTMENT.
+            </div>
+            <div class="fix-sql">UPDATE Isolates SET field = TRIM(field)</div>
+            <button class="btn btn-primary btn-sm" onclick="bulkFix('trim_all')">
+              Apply Fix
+            </button>
+          </div>
+          <div class="fix-card">
+            <div class="fix-title">ORGANISM → Lowercase</div>
+            <div class="fix-desc">
+              Standardize organism codes to lowercase as used in WHONET code
+              lists.
+            </div>
+            <div class="fix-sql">
+              UPDATE Isolates SET ORGANISM = LOWER(ORGANISM)
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="bulkFix('upper_organism')">
+              Apply Fix
+            </button>
+          </div>
+        </div>
 
-        <!-- SQL Editor -->
-        <div class="page" id="page-sql">
-          <div class="section-header">
-            <div>
-              <div class="section-title">💻 SQL Editor</div>
-              <div class="section-sub">
-                Execute arbitrary SELECT or UPDATE queries on the current
-                database
-              </div>
+        <div class="section-header" style="margin-top: 8px">
+          <div>
+            <div class="section-title" style="font-size: 15px">
+              📋 Fix History (This Session)
             </div>
           </div>
-          <div class="sql-editor-wrap">
-            <div class="sql-toolbar">
-              <button class="btn btn-primary btn-sm" onclick="runSQL()">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 16 16"
-                  fill="currentColor"
-                >
-                  <polygon points="4,2 14,8 4,14" />
-                </svg>
-                Run Query
-              </button>
-              <button class="btn btn-ghost btn-sm" onclick="clearSQL()">
-                Clear
-              </button>
-              <div class="sql-shortcuts">
-                <div
-                  class="sql-shortcut"
-                  onclick="
+        </div>
+        <div id="fix-history" style="display: flex; flex-direction: column; gap: 8px">
+          <div class="empty" style="padding: 24px">
+            <div class="empty-icon" style="font-size: 32px">📝</div>
+            <div class="empty-title">No fixes applied yet</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SQL Editor -->
+      <div class="page" id="page-sql">
+        <div class="section-header">
+          <div>
+            <div class="section-title">💻 SQL Editor</div>
+            <div class="section-sub">
+              Execute arbitrary SELECT or UPDATE queries on the current
+              database
+            </div>
+          </div>
+        </div>
+        <div class="sql-editor-wrap">
+          <div class="sql-toolbar">
+            <button class="btn btn-primary btn-sm" onclick="runSQL()">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <polygon points="4,2 14,8 4,14" />
+              </svg>
+              Run Query
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="clearSQL()">
+              Clear
+            </button>
+            <div class="sql-shortcuts">
+              <div class="sql-shortcut" onclick="
                     insertSQL(
                       'SELECT * FROM Isolates WHERE total_duplicates > 1',
                     )
-                  "
-                >
-                  Duplicates
-                </div>
-                <div
-                  class="sql-shortcut"
-                  onclick="
+                  ">
+                Duplicates
+              </div>
+              <div class="sql-shortcut" onclick="
                     insertSQL(
                       'SELECT SPEC_NUM, COUNT(*) as cnt FROM Isolates GROUP BY UPPER(SPEC_NUM) HAVING COUNT(*) > 1 ORDER BY cnt DESC',
                     )
-                  "
-                >
-                  Dup Groups
-                </div>
-                <div
-                  class="sql-shortcut"
-                  onclick="
+                  ">
+                Dup Groups
+              </div>
+              <div class="sql-shortcut" onclick="
                     insertSQL(
                       'UPDATE Isolates SET SPEC_NUM = UPPER(SPEC_NUM) WHERE SPEC_NUM != UPPER(SPEC_NUM)',
                     )
-                  "
-                >
-                  UPPER SPEC_NUM
-                </div>
-                <div
-                  class="sql-shortcut"
-                  onclick="
+                  ">
+                UPPER SPEC_NUM
+              </div>
+              <div class="sql-shortcut" onclick="
                     insertSQL(
                       `WITH RankedIsolates AS (\n  SELECT *,\n         ROW_NUMBER() OVER (PARTITION BY SPEC_NUM ORDER BY (SELECT NULL)) AS row_num,\n         COUNT(*) OVER (PARTITION BY SPEC_NUM) AS total_duplicates\n  FROM Isolates\n)\nSELECT *\nFROM RankedIsolates\nWHERE total_duplicates > 1\nORDER BY SPEC_NUM, row_num`,
                     )
-                  "
-                >
-                  Full Dup Query
-                </div>
+                  ">
+                Full Dup Query
               </div>
             </div>
-            <textarea
-              class="sql-input"
-              id="sql-input"
-              placeholder="-- Enter your SQL query here&#10;SELECT * FROM Isolates LIMIT 10;"
-            ></textarea>
-            <div class="sql-result" id="sql-result">
-              <span style="color: var(--text3)">Results will appear here…</span>
-            </div>
-            <div
-              class="result-table-wrap"
-              id="sql-result-table"
-              style="display: none"
-            ></div>
           </div>
+          <textarea class="sql-input" id="sql-input"
+            placeholder="-- Enter your SQL query here&#10;SELECT * FROM Isolates LIMIT 10;"></textarea>
+          <div class="sql-result" id="sql-result">
+            <span style="color: var(--text3)">Results will appear here…</span>
+          </div>
+          <div class="result-table-wrap" id="sql-result-table" style="display: none"></div>
         </div>
+      </div>
 
-        <!-- Monthly AMR Report (SAPCAR-Gujarat / National AMR Containment Programme) -->
-        <div class="page" id="page-monthly-amr">
-          <div class="section-header">
-            <div>
-              <div class="section-title">📊 Monthly AMR Surveillance Data</div>
-              <div class="section-sub">
-                Standardised Monthly Reporting Format for Culture &amp;
-                Sensitivity (C&amp;S) Testing Data — National Programme on AMR
-                Containment (All Months)
-              </div>
+      <!-- Monthly AMR Report (SAPCAR-Gujarat / National AMR Containment Programme) -->
+      <div class="page" id="page-monthly-amr">
+        <div class="section-header">
+          <div>
+            <div class="section-title">📊 Monthly AMR Surveillance Data</div>
+            <div class="section-sub">
+              Standardised Monthly Reporting Format for Culture &amp;
+              Sensitivity (C&amp;S) Testing Data — National Programme on AMR
+              Containment (All Months)
             </div>
-            <div
-              style="
+          </div>
+          <div style="
                 display: flex;
                 gap: 10px;
                 align-items: center;
                 margin-left: auto;
-              "
-            >
-              <button class="btn btn-primary btn-sm" onclick="exportAmrCsv()">
-                📥 Export All Months (CSV)
-              </button>
-              <button class="btn btn-ghost btn-sm" onclick="copyAmrTableTsv()">
-                📋 Copy Table (TSV / Excel)
-              </button>
-            </div>
+              ">
+            <button class="btn btn-primary btn-sm" onclick="exportAmrCsv()">
+              📥 Export All Months (CSV)
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="copyAmrTableTsv()">
+              📋 Copy Table (TSV / Excel)
+            </button>
           </div>
+        </div>
 
-          <!-- Official Standard Reporting Table -->
-          <div
-            class="table-wrap"
-            style="box-shadow: var(--shadow); overflow-x: auto"
-          >
-            <div
-              style="
+        <!-- Official Standard Reporting Table -->
+        <div class="table-wrap" style="box-shadow: var(--shadow); overflow-x: auto">
+          <div style="
                 padding: 14px 18px;
                 background: var(--bg3);
                 border-bottom: 1px solid var(--border);
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-              "
-            >
-              <div
-                style="font-weight: 700; font-size: 13.5px; color: var(--text)"
-              >
-                Monthly Reporting Format for Culture &amp; Sensitivity (C&amp;S)
-                Testing Data — Complete Monthly Overview
-              </div>
-              <div style="font-size: 11.5px; color: var(--text3)">
-                Calculated live directly from active WHONET database
-              </div>
+              ">
+            <div style="font-weight: 700; font-size: 13.5px; color: var(--text)">
+              Monthly Reporting Format for Culture &amp; Sensitivity (C&amp;S)
+              Testing Data — Complete Monthly Overview
             </div>
+            <div style="font-size: 11.5px; color: var(--text3)">
+              Calculated live directly from active WHONET database
+            </div>
+          </div>
 
-            <table
-              class="amr-report-table"
-              style="
+          <table class="amr-report-table" style="
                 width: 100%;
                 border-collapse: separate;
                 border-spacing: 0;
                 text-align: center;
                 font-size: 12px;
-              "
-            >
-              <thead>
-                <tr class="amr-th-primary">
-                  <th rowspan="2" class="th-month">Month, Year</th>
-                  <th colspan="4" class="th-group-samples-src">
-                    Total no. of samples received for culture (Source of sample)
-                  </th>
-                  <th rowspan="2" class="th-total-col">Total sample</th>
-                  <th colspan="4" class="th-group-pos-src">
-                    Total no. of Culture Positive Samples
-                  </th>
-                  <th rowspan="2" class="th-total-pos-col">
-                    Total positive sample
-                  </th>
-                  <th colspan="5" class="th-group-samples-type">
-                    Total no.of Samples received for culture (Type of sample)
-                  </th>
-                  <th rowspan="2" class="th-total-col">Total sample</th>
-                  <th colspan="5" class="th-group-pos-type">
-                    Total no. of Culture Positive Samples
-                  </th>
-                  <th rowspan="2" class="th-total-pos-col">
-                    Total positive sample
-                  </th>
-                </tr>
-                <tr class="amr-th-sub">
-                  <!-- Source of Sample -->
-                  <th>OPD</th>
-                  <th>IPD</th>
-                  <th>ICU</th>
-                  <th>Others</th>
+              ">
+            <thead>
+              <tr class="amr-th-primary">
+                <th rowspan="2" class="th-month">Month, Year</th>
+                <th colspan="4" class="th-group-samples-src">
+                  Total no. of samples received for culture (Source of sample)
+                </th>
+                <th rowspan="2" class="th-total-col">Total sample</th>
+                <th colspan="4" class="th-group-pos-src">
+                  Total no. of Culture Positive Samples
+                </th>
+                <th rowspan="2" class="th-total-pos-col">
+                  Total positive sample
+                </th>
+                <th colspan="5" class="th-group-samples-type">
+                  Total no.of Samples received for culture (Type of sample)
+                </th>
+                <th rowspan="2" class="th-total-col">Total sample</th>
+                <th colspan="5" class="th-group-pos-type">
+                  Total no. of Culture Positive Samples
+                </th>
+                <th rowspan="2" class="th-total-pos-col">
+                  Total positive sample
+                </th>
+              </tr>
+              <tr class="amr-th-sub">
+                <!-- Source of Sample -->
+                <th>OPD</th>
+                <th>IPD</th>
+                <th>ICU</th>
+                <th>Others</th>
 
-                  <!-- Positive by Source -->
-                  <th>OPD</th>
-                  <th>IPD</th>
-                  <th>ICU</th>
-                  <th>Others</th>
+                <!-- Positive by Source -->
+                <th>OPD</th>
+                <th>IPD</th>
+                <th>ICU</th>
+                <th>Others</th>
 
-                  <!-- Type of sample -->
-                  <th>Blood</th>
-                  <th>Pus</th>
-                  <th>Sputum</th>
-                  <th>Urine</th>
-                  <th>Others</th>
+                <!-- Type of sample -->
+                <th>Blood</th>
+                <th>Pus</th>
+                <th>Sputum</th>
+                <th>Urine</th>
+                <th>Others</th>
 
-                  <!-- Positive by Type -->
-                  <th>Blood</th>
-                  <th>Pus</th>
-                  <th>Sputum</th>
-                  <th>Urine</th>
-                  <th>Others</th>
-                </tr>
-              </thead>
-              <tbody id="amr-table-body">
-                <tr>
-                  <td
-                    colspan="26"
-                    style="
+                <!-- Positive by Type -->
+                <th>Blood</th>
+                <th>Pus</th>
+                <th>Sputum</th>
+                <th>Urine</th>
+                <th>Others</th>
+              </tr>
+            </thead>
+            <tbody id="amr-table-body">
+              <tr>
+                <td colspan="26" style="
                       padding: 24px;
                       text-align: center;
                       color: var(--text3);
-                    "
-                  >
-                    Loading AMR data…
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                    ">
+                  Loading AMR data…
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-          <!-- Instructions card based on official Circular -->
-          <div
-            style="
+        <!-- Instructions card based on official Circular -->
+        <div style="
               margin-top: 24px;
               background: var(--bg2);
               border: 1px solid var(--border);
               border-radius: var(--radius);
               padding: 18px 20px;
-            "
-          >
-            <div
-              style="
+            ">
+          <div style="
                 font-weight: 700;
                 font-size: 13.5px;
                 color: var(--text);
@@ -1089,146 +757,122 @@
                 display: flex;
                 align-items: center;
                 gap: 6px;
-              "
-            >
-              <span>ℹ️</span> Instructions for Sentinel Site Reporting
-              (SAPCAR-Gujarat):
-            </div>
-            <ul
-              style="
+              ">
+            <span>ℹ️</span> Instructions for Sentinel Site Reporting
+            (SAPCAR-Gujarat):
+          </div>
+          <ul style="
                 padding-left: 20px;
                 font-size: 12.5px;
                 line-height: 1.7;
                 color: var(--text2);
-              "
-            >
-              <li>
-                <strong>Submission Timeline:</strong> Format is requested to be
-                filled and shared with the State by the
-                <strong>5th of every following month</strong>.
-              </li>
-              <li>
-                <strong>Data Integrity:</strong> No column is to be left blank;
-                enter <code>0</code> only where actual
-              </li>
-              <li>
-                <strong>Positive Sample Definition:</strong>
-                No growth / normal commensals are defined as:
-                <ul>
-                  <li>
-                    <strong>Blood:</strong> <code>xxx</code> (no growth),
-                    <code>xpa</code>, <code>xep</code>, <code>xsg</code>,
-                    <code>nor</code> (normal flora), or
-                    <code>scn</code> (CoNS/skin contaminant).
-                  </li>
-                  <li>
-                    <strong>Other Sample Types:</strong> <code>xxx</code>,
-                    <code>xpa</code>, <code>xep</code>, <code>xsg</code>,
-                    <code>nor</code>, <code>ora</code>, or <code>vag</code>.
-                  </li>
-                </ul>
-                All other pathogens are identified and counted as positive
-                growth.
-              </li>
-              <li>
-                <strong>Specimen Grouping:</strong> Blood (<code>bl</code>), Pus
-                (<code>ps</code>), Sputum (<code>sp</code>), Urine
-                (<code>ur</code>), and Others (fluids, aspirates, swabs,
-                tissues).
-              </li>
-            </ul>
-          </div>
+              ">
+            <li>
+              <strong>Submission Timeline:</strong> Format is requested to be
+              filled and shared with the State by the
+              <strong>5th of every following month</strong>.
+            </li>
+            <li>
+              <strong>Data Integrity:</strong> No column is to be left blank;
+              enter <code>0</code> only where actual
+            </li>
+            <li>
+              <strong>Positive Sample Definition:</strong>
+              No growth / normal commensals are defined as:
+              <ul>
+                <li>
+                  <strong>Blood:</strong> <code>xxx</code> (no growth),
+                  <code>xpa</code>, <code>xep</code>, <code>xsg</code>,
+                  <code>nor</code> (normal flora), or
+                  <code>scn</code> (CoNS/skin contaminant).
+                </li>
+                <li>
+                  <strong>Other Sample Types:</strong> <code>xxx</code>,
+                  <code>xpa</code>, <code>xep</code>, <code>xsg</code>,
+                  <code>nor</code>, <code>ora</code>, or <code>vag</code>.
+                </li>
+              </ul>
+              All other pathogens are identified and counted as positive
+              growth.
+            </li>
+            <li>
+              <strong>Specimen Grouping:</strong> Blood (<code>bl</code>), Pus
+              (<code>ps</code>), Sputum (<code>sp</code>), Urine
+              (<code>ur</code>), and Others (fluids, aspirates, swabs,
+              tissues).
+            </li>
+          </ul>
         </div>
-      </main>
-    </div>
-
-    <!-- Toast container -->
-    <div id="toast-container"></div>
-
-    <!-- Detail Modal -->
-    <div class="modal-overlay" id="detail-modal">
-      <div class="modal">
-        <div class="modal-header">
-          <div class="modal-title" id="modal-title">Isolate Detail</div>
-          <div class="modal-close" onclick="closeModal()">✕</div>
-        </div>
-        <div class="modal-body" id="modal-body"></div>
       </div>
-    </div>
+    </main>
+  </div>
 
-    <!-- Confirm Modal -->
-    <div class="modal-overlay" id="confirm-modal">
-      <div class="modal" style="max-width: 480px">
-        <div class="modal-header">
-          <div class="modal-title" id="confirm-title">Confirm Action</div>
-          <div class="modal-close" onclick="closeConfirm()">✕</div>
-        </div>
-        <div class="modal-body">
-          <div id="confirm-body"></div>
-          <div
-            style="
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="detail-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-title">Isolate Detail</div>
+        <div class="modal-close" onclick="closeModal()">✕</div>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div class="modal-overlay" id="confirm-modal">
+    <div class="modal" style="max-width: 480px">
+      <div class="modal-header">
+        <div class="modal-title" id="confirm-title">Confirm Action</div>
+        <div class="modal-close" onclick="closeConfirm()">✕</div>
+      </div>
+      <div class="modal-body">
+        <div id="confirm-body"></div>
+        <div style="
               display: flex;
               gap: 10px;
               margin-top: 18px;
               justify-content: flex-end;
-            "
-          >
-            <button class="btn btn-ghost" onclick="closeConfirm()">
-              Cancel
-            </button>
-            <button
-              class="btn btn-danger"
-              id="confirm-ok-btn"
-              onclick="executeConfirm()"
-            >
-              Confirm
-            </button>
-          </div>
+            ">
+          <button class="btn btn-ghost" onclick="closeConfirm()">
+            Cancel
+          </button>
+          <button class="btn btn-danger" id="confirm-ok-btn" onclick="executeConfirm()">
+            Confirm
+          </button>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Initial Disclaimer Modal -->
-    <div class="modal-overlay" id="disclaimer-modal">
-      <div class="modal" style="max-width: 540px">
-        <div
-          class="modal-header"
-          style="
+  <!-- Initial Disclaimer Modal -->
+  <div class="modal-overlay" id="disclaimer-modal">
+    <div class="modal" style="max-width: 540px">
+      <div class="modal-header" style="
             background: #212529;
             color: #fff;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          "
-        >
-          <div
-            class="modal-title"
-            style="display: flex; align-items: center; gap: 10px"
-          >
-            <img
-              src="https://whonet.org/img/WHONET_Logo_transparentbg.png"
-              style="height: 24px; width: auto"
-              alt="WHONET"
-            />
-            <span>WHONET Data Tool — Welcome &amp; Notice</span>
-          </div>
+          ">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 10px">
+          <img src="/whonet-logo.png" style="height: 24px; width: auto" alt="WHONET" />
+          <span>WHONET Data Tool — Welcome &amp; Notice</span>
         </div>
-        <div class="modal-body" style="padding: 22px 24px">
-          <div
-            style="
+      </div>
+      <div class="modal-body" style="padding: 22px 24px">
+        <div style="
               font-size: 13.5px;
               line-height: 1.6;
               color: var(--text);
               margin-bottom: 14px;
-            "
-          >
-            Welcome to the
-            <strong
-              >WHONET Laboratory Database Quality &amp; Surveillance
-              Utility</strong
-            >.
-          </div>
+            ">
+          Welcome to the
+          <strong>WHONET Laboratory Database Quality &amp; Surveillance
+            Utility</strong>.
+        </div>
 
-          <div
-            style="
+        <div style="
               background: var(--accent-light);
               border: 1px solid var(--border);
               border-radius: 8px;
@@ -1237,30 +881,28 @@
               color: var(--text2);
               margin-bottom: 14px;
               line-height: 1.5;
-            "
-          >
-            🛡️ <strong>Safety, Privacy &amp; Verification:</strong>
-            <ul style="margin: 6px 0 0 16px; padding: 0">
-              <li>
-                <strong>Zero Server Upload:</strong> Operates locally inside
-                your browser; no patient or laboratory data is sent to any
-                remote server.
-              </li>
-              <li>
-                <strong>Data Quality Dependent:</strong> Generated surveillance
-                counts and metrics depend strictly on the entry quality and
-                standardized coding of your WHONET data.
-              </li>
-              <li>
-                <strong>Manual Verification:</strong> Always verify all figures
-                manually before submitting to any surveillance authority or
-                reporting program.
-              </li>
-            </ul>
-          </div>
+            ">
+          🛡️ <strong>Safety, Privacy &amp; Verification:</strong>
+          <ul style="margin: 6px 0 0 16px; padding: 0">
+            <li>
+              <strong>Zero Server Upload:</strong> Operates locally inside
+              your browser; no patient or laboratory data is sent to any
+              remote server.
+            </li>
+            <li>
+              <strong>Data Quality Dependent:</strong> Generated surveillance
+              counts and metrics depend strictly on the entry quality and
+              standardized coding of your WHONET data.
+            </li>
+            <li>
+              <strong>Manual Verification:</strong> Always verify all figures
+              manually before submitting to any surveillance authority or
+              reporting program.
+            </li>
+          </ul>
+        </div>
 
-          <div
-            style="
+        <div style="
               font-size: 11px;
               color: var(--text3);
               line-height: 1.5;
@@ -1269,84 +911,60 @@
               border-radius: 6px;
               border: 1px solid var(--border);
               margin-bottom: 20px;
-            "
-          >
-            <strong>Legal &amp; Ownership Disclaimer:</strong> WHONET is the
-            property of the
-            <strong
-              >WHO Collaborating Centre for Surveillance of Antimicrobial
-              Resistance</strong
-            >
-            (Brigham and Women's Hospital &amp; Harvard Medical School,
-            co-founded by Drs. Thomas O'Brien &amp; John Stelling). Copyright ©
-            WHONET 1989–2026.<br /><br />
-            This independent open-source quality tool is developed by
-            <a
-              href="https://drshtmstry.github.io/"
-              target="_blank"
-              rel="noopener noreferrer"
-              style="
+            ">
+          <strong>Legal &amp; Ownership Disclaimer:</strong> WHONET is the
+          property of the
+          <strong>WHO Collaborating Centre for Surveillance of Antimicrobial
+            Resistance</strong>
+          (Brigham and Women's Hospital &amp; Harvard Medical School,
+          co-founded by Drs. Thomas O'Brien &amp; John Stelling). Copyright ©
+          WHONET 1989–2026.<br /><br />
+          This independent open-source quality tool is developed by
+          <a href="https://drshtmstry.github.io/" target="_blank" rel="noopener noreferrer" style="
                 color: var(--accent);
                 font-weight: 600;
                 text-decoration: none;
-              "
-              >Dr. Darshit Mistry</a
-            >
-            as a community utility.
-          </div>
-          <div style="display: flex; gap: 10px; justify-content: flex-end">
-            <button
-              class="btn btn-primary"
-              onclick="proceedToDataSourceModal()"
-              style="padding: 8px 24px; font-size: 13.5px; font-weight: 600"
-            >
-              I Understand &amp; Continue →
-            </button>
-          </div>
+              ">Dr. Darshit Mistry</a>
+          as a community utility.
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end">
+          <button class="btn btn-primary" onclick="proceedToDataSourceModal()"
+            style="padding: 8px 24px; font-size: 13.5px; font-weight: 600">
+            I Understand &amp; Continue →
+          </button>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Data Source Selection Modal (Options: Default WHONET path list OR Upload/Browse) -->
-    <div class="modal-overlay" id="source-modal">
-      <div class="modal" style="max-width: 620px">
-        <div
-          class="modal-header"
-          style="
+  <!-- Data Source Selection Modal (Options: Default WHONET path list OR Upload/Browse) -->
+  <div class="modal-overlay" id="source-modal">
+    <div class="modal" style="max-width: 620px">
+      <div class="modal-header" style="
             background: #212529;
             color: #fff;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          "
-        >
-          <div
-            class="modal-title"
-            style="display: flex; align-items: center; gap: 10px"
-          >
-            <span>📂</span>
-            <span>Select WHONET Database to Open</span>
-          </div>
+          ">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 10px">
+          <span>📂</span>
+          <span>Select WHONET Database to Open</span>
         </div>
-        <div class="modal-body" style="padding: 22px 24px">
-          <div
-            style="font-size: 13.5px; color: var(--text2); margin-bottom: 18px"
-          >
-            Choose how you would like to load your WHONET laboratory database:
-          </div>
+      </div>
+      <div class="modal-body" style="padding: 22px 24px">
+        <div style="font-size: 13.5px; color: var(--text2); margin-bottom: 18px">
+          Choose how you would like to load your WHONET laboratory database:
+        </div>
 
-          <!-- Two interactive option cards -->
-          <div style="display: flex; flex-direction: column; gap: 16px">
-            <!-- Option 1: Select from default path (Local Server) -->
-            <div
-              id="launch-option-local"
-              style="
+        <!-- Two interactive option cards -->
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <!-- Option 1: Select from default path (Local Server) -->
+          <div id="launch-option-local" style="
                 background: var(--bg3);
                 border: 1px solid var(--border);
                 border-radius: 10px;
                 padding: 16px;
-              "
-            >
-              <div
-                style="
+              ">
+            <div style="
                   font-weight: 700;
                   font-size: 13.5px;
                   color: var(--accent);
@@ -1354,97 +972,64 @@
                   display: flex;
                   align-items: center;
                   gap: 6px;
-                "
-              >
-                <span>📁</span> Option 1: Select file from WHONET Data Folder
-              </div>
-              <div
-                id="launch-local-desc"
-                style="
+                ">
+              <span>📁</span> Option 1: Select file from WHONET Data Folder
+            </div>
+            <div id="launch-local-desc" style="
                   font-size: 12px;
                   color: var(--text3);
                   margin-bottom: 10px;
-                "
-              >
-                Folder:
-                <code
-                  style="
+                ">
+              Folder:
+              <code style="
                     background: var(--bg2);
                     padding: 2px 6px;
                     border-radius: 4px;
                     border: 1px solid var(--border);
                     color: var(--text);
-                  "
-                  >C:\WHONET\Data</code
-                >
-              </div>
-              <div style="display: flex; gap: 10px; align-items: center">
-                <select
-                  id="launch-db-select"
-                  class="filter-select"
-                  style="
+                  ">C:\WHONET\Data</code>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center">
+              <select id="launch-db-select" class="filter-select" style="
                     flex: 1;
                     background: var(--bg2);
                     font-weight: 600;
                     padding: 8px 12px;
-                  "
-                >
-                  <option value="">Scanning folder…</option>
-                </select>
-                <button
-                  id="btn-open-launch-file"
-                  class="btn btn-primary btn-sm"
-                  onclick="selectFromLaunchList()"
-                  style="padding: 8px 16px"
-                >
-                  Open File
-                </button>
-              </div>
-              <div id="launch-dir-actions" style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
-                <button
-                  type="button"
-                  id="btn-pick-folder"
-                  class="btn btn-sm btn-primary"
-                  onclick="chooseWhonetFolder()"
-                  style="padding: 6px 14px; font-size: 12px; display: none"
-                >
-                  📂 Select WHONET Folder (C:\WHONET\Data)
-                </button>
-                <input
-                  type="file"
-                  id="folder-input-fallback"
-                  webkitdirectory
-                  directory
-                  style="display: none"
-                  onchange="handleFolderSelected(this.files)"
-                />
-                <a
-                  href="javascript:void(0)"
-                  id="link-custom-path"
-                  onclick="openPathFromLaunch()"
-                  style="
+                  ">
+                <option value="">Scanning folder…</option>
+              </select>
+              <button id="btn-open-launch-file" class="btn btn-primary btn-sm" onclick="selectFromLaunchList()"
+                style="padding: 8px 16px">
+                Open File
+              </button>
+            </div>
+            <div id="launch-dir-actions"
+              style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+              <button type="button" id="btn-pick-folder" class="btn btn-sm btn-primary" onclick="chooseWhonetFolder()"
+                style="padding: 6px 14px; font-size: 12px; display: none">
+                📂 Select WHONET Folder (C:\WHONET\Data)
+              </button>
+              <input type="file" id="folder-input-fallback" webkitdirectory directory style="display: none"
+                onchange="handleFolderSelected(this.files)" />
+              <a href="javascript:void(0)" id="link-custom-path" onclick="openPathFromLaunch()" style="
                     font-size: 11.5px;
                     color: var(--accent);
                     text-decoration: none;
-                  "
-                >
-                  📝 Or enter a custom file path…
-                </a>
-              </div>
+                  ">
+                📝 Or enter a custom file path…
+              </a>
             </div>
+          </div>
 
-            <!-- Option 2: Upload / Browse file -->
-            <div
-              style="
+          <!-- Option 2: Upload / Browse file -->
+          <div style="
                 background: var(--bg3);
                 border: 1px solid var(--border);
                 border-radius: 10px;
                 padding: 16px;
                 text-align: center;
-              "
-            >
-              <div
-                style="
+              ">
+            <div style="
                   font-weight: 700;
                   font-size: 13.5px;
                   color: var(--green);
@@ -1453,47 +1038,33 @@
                   align-items: center;
                   justify-content: center;
                   gap: 6px;
-                "
-              >
-                <span>⬆️</span> Option 2: Upload / Browse or Drag &amp; Drop
-              </div>
-              <div
-                style="
+                ">
+              <span>⬆️</span> Option 2: Upload / Browse or Drag &amp; Drop
+            </div>
+            <div style="
                   font-size: 12px;
                   color: var(--text2);
                   margin-bottom: 12px;
-                "
-              >
-                Select any <strong>.sqlite</strong> database file from your
-                computer or external drive.
-              </div>
-              <button
-                class="btn btn-success btn-sm"
-                onclick="triggerBrowseFile()"
-                style="padding: 8px 20px; font-size: 13px"
-              >
-                📁 Browse &amp; Open .sqlite File
-              </button>
-              <input
-                type="file"
-                id="launch-file-input"
-                accept=".sqlite"
-                style="display: none"
-                onchange="handleLaunchFileUpload(this.files[0])"
-              />
+                ">
+              Select any <strong>.sqlite</strong> database file from your
+              computer or external drive.
             </div>
+            <button class="btn btn-success btn-sm" onclick="triggerBrowseFile()"
+              style="padding: 8px 20px; font-size: 13px">
+              📁 Browse &amp; Open .sqlite File
+            </button>
+            <input type="file" id="launch-file-input" accept=".sqlite" style="display: none"
+              onchange="handleLaunchFileUpload(this.files[0])" />
+          </div>
 
-            <!-- Option 3: Bundled WHO Sample Databases (Online / Demo) -->
-            <div
-              style="
+          <!-- Option 3: Bundled WHO Sample Databases (Online / Demo) -->
+          <div style="
                 background: var(--bg3);
                 border: 1px solid var(--border);
                 border-radius: 10px;
                 padding: 16px;
-              "
-            >
-              <div
-                style="
+              ">
+            <div style="
                   font-weight: 700;
                   font-size: 13.5px;
                   color: var(--purple);
@@ -1501,77 +1072,67 @@
                   display: flex;
                   align-items: center;
                   gap: 6px;
-                "
-              >
-                <span>🧪</span> Option 3: Bundled Sample Data (Online / Demo)
-              </div>
-              <div
-                style="
+                ">
+              <span>🧪</span> Option 3: Bundled Sample Data (Online / Demo)
+            </div>
+            <div style="
                   font-size: 12px;
                   color: var(--text3);
                   margin-bottom: 10px;
-                "
-              >
-                Official WHO-TST test datasets bundled for instant testing
-                without uploading files:
-              </div>
-              <div style="display: flex; gap: 10px; flex-wrap: wrap">
-                <button
-                  class="btn btn-ghost btn-sm"
-                  onclick="loadSampleFromLaunch('WHO-TST-2020-01.sqlite')"
-                  style="
+                ">
+              Official WHO-TST test datasets bundled for instant testing
+              without uploading files:
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap">
+              <button class="btn btn-ghost btn-sm" onclick="loadSampleFromLaunch('WHO-TST-2020-01.sqlite')" style="
                     flex: 1;
                     min-width: 180px;
                     justify-content: center;
                     border-color: rgba(124, 58, 237, 0.3);
                     color: var(--purple);
-                  "
-                >
-                  🧪 WHO-TST-2020-01
-                </button>
-                <button
-                  class="btn btn-ghost btn-sm"
-                  onclick="
+                  ">
+                🧪 WHO-TST-2020-01
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="
                     loadSampleFromLaunch('WHO-TST-2020-OneHealth.sqlite')
-                  "
-                  style="
+                  " style="
                     flex: 1;
                     min-width: 180px;
                     justify-content: center;
                     border-color: rgba(124, 58, 237, 0.3);
                     color: var(--purple);
-                  "
-                >
-                  🌐 WHO-TST OneHealth
-                </button>
-              </div>
+                  ">
+                🌐 WHO-TST OneHealth
+              </button>
             </div>
           </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <script src="organisms.js"></script>
-    <script src="app.js"></script>
-    <script>
-      // Live reload client for active dev tabs
-      (function () {
-        if (
-          window.location.hostname === "localhost" ||
-          window.location.hostname === "127.0.0.1"
-        ) {
-          const es = new EventSource("/api/live-reload");
-          es.onmessage = function (e) {
-            if (e.data === "reload") {
-              console.log("[LiveReload] Refreshing...");
-              window.location.reload();
-            }
-          };
-          es.onerror = function () {
-            // Reconnect silently if disconnected
-          };
-        }
-      })();
-    </script>
-  </body>
+  <script src="organisms.js"></script>
+  <script src="app.js"></script>
+  <script>
+    // Live reload client for active dev tabs
+    (function () {
+      if (
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1"
+      ) {
+        const es = new EventSource("/api/live-reload");
+        es.onmessage = function (e) {
+          if (e.data === "reload") {
+            console.log("[LiveReload] Refreshing...");
+            window.location.reload();
+          }
+        };
+        es.onerror = function () {
+          // Reconnect silently if disconnected
+        };
+      }
+    })();
+  </script>
+</body>
+
 </html>

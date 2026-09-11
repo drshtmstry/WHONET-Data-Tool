@@ -60,7 +60,7 @@ async function getSqlJs() {
     throw new Error('sql.js library not loaded in browser');
   }
   const SQL = await window.initSqlJs({
-    locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.12.0/${file}`
+    locateFile: file => `vendor/${file}`
   });
   state.sqlJsInstance = SQL;
   return SQL;
@@ -362,7 +362,7 @@ function handleWasmApi(path, options = {}) {
 
     if (pathname === '/api/update-field') {
       const { row_idx, field, value } = body;
-      const EDITABLE_FIELDS = ['SPEC_NUM','PATIENT_ID','SPEC_TYPE','ORGANISM','FULL_NAME','SEX','AGE','WARD','DEPARTMENT','COMMENT','ESBL','CARBAPENEM','MRSA','URINECOUNT','SEROTYPE','BETA_LACT','INDUC_CLI'];
+      const EDITABLE_FIELDS = ['SPEC_NUM', 'PATIENT_ID', 'SPEC_TYPE', 'ORGANISM', 'FULL_NAME', 'SEX', 'AGE', 'WARD', 'DEPARTMENT', 'COMMENT', 'ESBL', 'CARBAPENEM', 'MRSA', 'URINECOUNT', 'SEROTYPE', 'BETA_LACT', 'INDUC_CLI'];
       if (!EDITABLE_FIELDS.includes(field)) return { error: 'Field not editable' };
       const res = wasmRun(`UPDATE Isolates SET ${field} = ? WHERE ROW_IDX = ?`, [value, row_idx]);
       return { ok: true, changes: res.changes };
@@ -822,19 +822,19 @@ function handleFileDrop(e) {
   }
 }
 
-    // ── Stats / Dashboard ──
-    async function loadStats() {
-      if (!state.currentDb) return;
-      document.getElementById('db-label').textContent = state.currentDb;
-      const data = await api('/api/stats');
-      if (data.error) return toast(data.error, 'error');
-      state.stats = data;
+// ── Stats / Dashboard ──
+async function loadStats() {
+  if (!state.currentDb) return;
+  document.getElementById('db-label').textContent = state.currentDb;
+  const data = await api('/api/stats');
+  if (data.error) return toast(data.error, 'error');
+  state.stats = data;
 
-      // Update badge
-      const activeDupCount = state.dupMode === 'patient' ? (data.dupPtRows || 0) : (data.dupRows || 0);
-      document.getElementById('dup-badge').textContent = activeDupCount;
+  // Update badge
+  const activeDupCount = state.dupMode === 'patient' ? (data.dupPtRows || 0) : (data.dupRows || 0);
+  document.getElementById('dup-badge').textContent = activeDupCount;
 
-      document.getElementById('stats-grid').innerHTML = `
+  document.getElementById('stats-grid').innerHTML = `
     <div class="stat-card">
       <div class="stat-label">Total Isolates</div>
       <div class="stat-value">${data.total.toLocaleString()}</div>
@@ -862,301 +862,301 @@ function handleFileDrop(e) {
     </div>
   `;
 
-      // Populate filters
-      const orgFilter = document.getElementById('isolates-org-filter');
-      orgFilter.innerHTML = '<option value="">All Organisms</option>' +
-        data.organisms.map(o => {
-          const name = getOrganismName(o);
-          const label = name ? `${o} — ${name}` : o;
-          return `<option value="${o}">${label}</option>`;
-        }).join('');
-      const wardFilter = document.getElementById('isolates-ward-filter');
-      wardFilter.innerHTML = '<option value="">All Wards</option>' +
-        data.wards.map(w => `<option value="${w}">${w}</option>`).join('');
+  // Populate filters
+  const orgFilter = document.getElementById('isolates-org-filter');
+  orgFilter.innerHTML = '<option value="">All Organisms</option>' +
+    data.organisms.map(o => {
+      const name = getOrganismName(o);
+      const label = name ? `${o} — ${name}` : o;
+      return `<option value="${o}">${label}</option>`;
+    }).join('');
+  const wardFilter = document.getElementById('isolates-ward-filter');
+  wardFilter.innerHTML = '<option value="">All Wards</option>' +
+    data.wards.map(w => `<option value="${w}">${w}</option>`).join('');
 
-      // Organisms list (if present in DOM)
-      const orgListEl = document.getElementById('org-list');
-      if (orgListEl) {
-        orgListEl.innerHTML = data.organisms.slice(0, 20).map(o => {
-          const name = getOrganismName(o);
-          const titleAttr = name ? `title="${name} (${o})"` : `title="${o}"`;
-          return `<span class="badge badge-org" ${titleAttr} style="cursor:pointer" onclick="showPage('isolates');document.getElementById('isolates-org-filter').value='${o}';loadIsolates(1)">${o}</span>`;
-        }).join('');
-      }
+  // Organisms list (if present in DOM)
+  const orgListEl = document.getElementById('org-list');
+  if (orgListEl) {
+    orgListEl.innerHTML = data.organisms.slice(0, 20).map(o => {
+      const name = getOrganismName(o);
+      const titleAttr = name ? `title="${name} (${o})"` : `title="${o}"`;
+      return `<span class="badge badge-org" ${titleAttr} style="cursor:pointer" onclick="showPage('isolates');document.getElementById('isolates-org-filter').value='${o}';loadIsolates(1)">${o}</span>`;
+    }).join('');
+  }
 
-      // Refresh dynamic visual charts
-      updateDashboardCharts();
+  // Refresh dynamic visual charts
+  updateDashboardCharts();
+}
+
+// ── Dynamic Visual Analytics (Chart.js Engine) ──
+let barChartInstance = null;
+let pieChartInstance = null;
+let currentChartDisplayMode = 'both'; // 'both' | 'bar' | 'pie'
+
+function setChartTypeMode(mode) {
+  currentChartDisplayMode = mode;
+  const grid = document.getElementById('charts-view-grid');
+  if (grid) {
+    grid.classList.remove('single-bar', 'single-pie');
+    if (mode === 'bar') grid.classList.add('single-bar');
+    if (mode === 'pie') grid.classList.add('single-pie');
+  }
+
+  ['both', 'bar', 'pie'].forEach(m => {
+    const btn = document.getElementById(`btn-chart-${m}`);
+    if (btn) btn.classList.toggle('active', m === mode);
+  });
+
+  if (barChartInstance) barChartInstance.resize();
+  if (pieChartInstance) pieChartInstance.resize();
+}
+
+function onPeriodFilterChange() {
+  const period = document.getElementById('chart-period-select')?.value || 'all';
+  const customDates = document.getElementById('chart-custom-dates');
+  if (customDates) {
+    customDates.style.display = period === 'custom' ? 'flex' : 'none';
+  }
+  updateDashboardCharts();
+}
+
+function resetChartZoom(chartType) {
+  if (chartType === 'bar' && barChartInstance) {
+    barChartInstance.resetZoom ? barChartInstance.resetZoom() : barChartInstance.update();
+  }
+  updateDashboardCharts();
+}
+
+const PALETTE_COLORS = [
+  '#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed',
+  '#0891b2', '#db2777', '#4f46e5', '#ca8a04', '#16a34a',
+  '#ea580c', '#9333ea', '#0284c7', '#65a30d', '#64748b'
+];
+
+async function updateDashboardCharts() {
+  if (!state.currentDb) return;
+  if (typeof Chart === 'undefined') {
+    console.warn('Chart.js library is not yet loaded');
+    return;
+  }
+
+  const param = document.getElementById('chart-param-select')?.value || 'ORGANISM';
+  const period = document.getElementById('chart-period-select')?.value || 'all';
+  const startDate = document.getElementById('chart-date-start')?.value || '';
+  const endDate = document.getElementById('chart-date-end')?.value || '';
+
+  const queryParams = new URLSearchParams({
+    param,
+    period,
+    startDate,
+    endDate
+  });
+
+  const res = await api(`/api/chart-data?${queryParams.toString()}`);
+  if (res.error) {
+    console.warn('Chart data query failed:', res.error);
+    return;
+  }
+
+  const rows = res.rows || [];
+  const totalFiltered = res.totalFiltered || 0;
+
+  // Update subtitle info
+  const sub = document.getElementById('chart-filtered-sub');
+  const paramText = document.getElementById('chart-param-select')?.selectedOptions[0]?.text || param;
+  if (sub) {
+    const periodText = period === 'custom'
+      ? `Range: ${startDate || 'start'} to ${endDate || 'end'}`
+      : document.getElementById('chart-period-select')?.selectedOptions[0]?.text || period;
+    sub.textContent = `${paramText} • ${periodText} • ${totalFiltered.toLocaleString()} isolates matched`;
+  }
+
+  const pieBadge = document.getElementById('pie-total-badge');
+  if (pieBadge) {
+    pieBadge.textContent = `${totalFiltered.toLocaleString()} records`;
+  }
+
+  // Format Labels with human-friendly descriptions
+  const labels = rows.map(r => {
+    let label = String(r.label || 'Unknown');
+    if (param === 'ORGANISM') {
+      const orgName = getOrganismName(label);
+      if (orgName) return `${orgName} (${label})`;
     }
-
-    // ── Dynamic Visual Analytics (Chart.js Engine) ──
-    let barChartInstance = null;
-    let pieChartInstance = null;
-    let currentChartDisplayMode = 'both'; // 'both' | 'bar' | 'pie'
-
-    function setChartTypeMode(mode) {
-      currentChartDisplayMode = mode;
-      const grid = document.getElementById('charts-view-grid');
-      if (grid) {
-        grid.classList.remove('single-bar', 'single-pie');
-        if (mode === 'bar') grid.classList.add('single-bar');
-        if (mode === 'pie') grid.classList.add('single-pie');
-      }
-
-      ['both', 'bar', 'pie'].forEach(m => {
-        const btn = document.getElementById(`btn-chart-${m}`);
-        if (btn) btn.classList.toggle('active', m === mode);
-      });
-
-      if (barChartInstance) barChartInstance.resize();
-      if (pieChartInstance) pieChartInstance.resize();
+    if (param === 'SPEC_TYPE') {
+      const dict = { bl: 'Blood (bl)', ps: 'Pus (ps)', sp: 'Sputum (sp)', ur: 'Urine (ur)', st: 'Stool (st)', cs: 'CSF (cs)' };
+      if (dict[label.toLowerCase()]) return dict[label.toLowerCase()];
     }
-
-    function onPeriodFilterChange() {
-      const period = document.getElementById('chart-period-select')?.value || 'all';
-      const customDates = document.getElementById('chart-custom-dates');
-      if (customDates) {
-        customDates.style.display = period === 'custom' ? 'flex' : 'none';
-      }
-      updateDashboardCharts();
+    if (param === 'WARD_TYPE') {
+      const dict = { in: 'Inpatient (in)', out: 'Outpatient (out)', icu: 'ICU (icu)' };
+      if (dict[label.toLowerCase()]) return dict[label.toLowerCase()];
     }
-
-    function resetChartZoom(chartType) {
-      if (chartType === 'bar' && barChartInstance) {
-        barChartInstance.resetZoom ? barChartInstance.resetZoom() : barChartInstance.update();
-      }
-      updateDashboardCharts();
+    if (param === 'SEX') {
+      const dict = { m: 'Male (m)', f: 'Female (f)', u: 'Unknown (u)' };
+      if (dict[label.toLowerCase()]) return dict[label.toLowerCase()];
     }
+    return label;
+  });
 
-    const PALETTE_COLORS = [
-      '#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed',
-      '#0891b2', '#db2777', '#4f46e5', '#ca8a04', '#16a34a',
-      '#ea580c', '#9333ea', '#0284c7', '#65a30d', '#64748b'
-    ];
+  const counts = rows.map(r => r.count);
+  const bgColors = rows.map((_, i) => PALETTE_COLORS[i % PALETTE_COLORS.length]);
 
-    async function updateDashboardCharts() {
-      if (!state.currentDb) return;
-      if (typeof Chart === 'undefined') {
-        console.warn('Chart.js library is not yet loaded');
-        return;
-      }
+  // ── Render Bar Chart ──
+  const barCanvas = document.getElementById('dashboard-bar-chart');
+  if (barCanvas) {
+    const barCtx = barCanvas.getContext('2d');
+    if (barChartInstance) barChartInstance.destroy();
 
-      const param = document.getElementById('chart-param-select')?.value || 'ORGANISM';
-      const period = document.getElementById('chart-period-select')?.value || 'all';
-      const startDate = document.getElementById('chart-date-start')?.value || '';
-      const endDate = document.getElementById('chart-date-end')?.value || '';
-
-      const queryParams = new URLSearchParams({
-        param,
-        period,
-        startDate,
-        endDate
-      });
-
-      const res = await api(`/api/chart-data?${queryParams.toString()}`);
-      if (res.error) {
-        console.warn('Chart data query failed:', res.error);
-        return;
-      }
-
-      const rows = res.rows || [];
-      const totalFiltered = res.totalFiltered || 0;
-
-      // Update subtitle info
-      const sub = document.getElementById('chart-filtered-sub');
-      const paramText = document.getElementById('chart-param-select')?.selectedOptions[0]?.text || param;
-      if (sub) {
-        const periodText = period === 'custom'
-          ? `Range: ${startDate || 'start'} to ${endDate || 'end'}`
-          : document.getElementById('chart-period-select')?.selectedOptions[0]?.text || period;
-        sub.textContent = `${paramText} • ${periodText} • ${totalFiltered.toLocaleString()} isolates matched`;
-      }
-
-      const pieBadge = document.getElementById('pie-total-badge');
-      if (pieBadge) {
-        pieBadge.textContent = `${totalFiltered.toLocaleString()} records`;
-      }
-
-      // Format Labels with human-friendly descriptions
-      const labels = rows.map(r => {
-        let label = String(r.label || 'Unknown');
-        if (param === 'ORGANISM') {
-          const orgName = getOrganismName(label);
-          if (orgName) return `${orgName} (${label})`;
-        }
-        if (param === 'SPEC_TYPE') {
-          const dict = { bl: 'Blood (bl)', ps: 'Pus (ps)', sp: 'Sputum (sp)', ur: 'Urine (ur)', st: 'Stool (st)', cs: 'CSF (cs)' };
-          if (dict[label.toLowerCase()]) return dict[label.toLowerCase()];
-        }
-        if (param === 'WARD_TYPE') {
-          const dict = { in: 'Inpatient (in)', out: 'Outpatient (out)', icu: 'ICU (icu)' };
-          if (dict[label.toLowerCase()]) return dict[label.toLowerCase()];
-        }
-        if (param === 'SEX') {
-          const dict = { m: 'Male (m)', f: 'Female (f)', u: 'Unknown (u)' };
-          if (dict[label.toLowerCase()]) return dict[label.toLowerCase()];
-        }
-        return label;
-      });
-
-      const counts = rows.map(r => r.count);
-      const bgColors = rows.map((_, i) => PALETTE_COLORS[i % PALETTE_COLORS.length]);
-
-      // ── Render Bar Chart ──
-      const barCanvas = document.getElementById('dashboard-bar-chart');
-      if (barCanvas) {
-        const barCtx = barCanvas.getContext('2d');
-        if (barChartInstance) barChartInstance.destroy();
-
-        barChartInstance = new Chart(barCtx, {
-          type: 'bar',
-          data: {
-            labels,
-            datasets: [{
-              label: 'Isolates Count',
-              data: counts,
-              backgroundColor: bgColors.map(c => c + 'cc'),
-              borderColor: bgColors,
-              borderWidth: 1.5,
-              borderRadius: 5,
-              maxBarThickness: 38
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: { duration: 400 },
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                titleFont: { family: 'Inter', size: 12, weight: 'bold' },
-                bodyFont: { family: 'Inter', size: 12 },
-                padding: 10,
-                callbacks: {
-                  label: ctx => {
-                    const cnt = ctx.parsed.y || 0;
-                    const pct = totalFiltered > 0 ? ((cnt / totalFiltered) * 100).toFixed(1) : '0.0';
-                    return `Count: ${cnt.toLocaleString()} (${pct}%)`;
-                  }
-                }
-              }
-            },
-            scales: {
-              x: {
-                grid: { display: false },
-                ticks: {
-                  font: { family: 'Inter', size: 11 },
-                  color: '#475569',
-                  maxRotation: 40,
-                  minRotation: 0,
-                  callback: function(val, index) {
-                    const raw = labels[index] || '';
-                    return raw.length > 20 ? raw.substring(0, 18) + '…' : raw;
-                  }
-                }
-              },
-              y: {
-                beginAtZero: true,
-                grid: { color: 'rgba(226, 232, 240, 0.8)' },
-                ticks: {
-                  font: { family: 'JetBrains Mono', size: 11 },
-                  color: '#64748b',
-                  precision: 0
-                }
+    barChartInstance = new Chart(barCtx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Isolates Count',
+          data: counts,
+          backgroundColor: bgColors.map(c => c + 'cc'),
+          borderColor: bgColors,
+          borderWidth: 1.5,
+          borderRadius: 5,
+          maxBarThickness: 38
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            titleFont: { family: 'Inter', size: 12, weight: 'bold' },
+            bodyFont: { family: 'Inter', size: 12 },
+            padding: 10,
+            callbacks: {
+              label: ctx => {
+                const cnt = ctx.parsed.y || 0;
+                const pct = totalFiltered > 0 ? ((cnt / totalFiltered) * 100).toFixed(1) : '0.0';
+                return `Count: ${cnt.toLocaleString()} (${pct}%)`;
               }
             }
           }
-        });
-      }
-
-      // ── Render Pie / Doughnut Chart ──
-      const pieCanvas = document.getElementById('dashboard-pie-chart');
-      if (pieCanvas) {
-        const pieCtx = pieCanvas.getContext('2d');
-        if (pieChartInstance) pieChartInstance.destroy();
-
-        pieChartInstance = new Chart(pieCtx, {
-          type: 'doughnut',
-          data: {
-            labels,
-            datasets: [{
-              data: counts,
-              backgroundColor: bgColors,
-              borderColor: '#ffffff',
-              borderWidth: 2,
-              hoverOffset: 6
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: { duration: 400 },
-            plugins: {
-              legend: {
-                position: 'right',
-                labels: {
-                  boxWidth: 12,
-                  boxHeight: 12,
-                  padding: 8,
-                  font: { family: 'Inter', size: 11 },
-                  color: '#334155',
-                  generateLabels: function(chart) {
-                    const data = chart.data;
-                    if (data.labels.length && data.datasets.length) {
-                      return data.labels.map((lbl, i) => {
-                        const val = data.datasets[0].data[i] || 0;
-                        const pct = totalFiltered > 0 ? ((val / totalFiltered) * 100).toFixed(1) : 0;
-                        const shortLbl = lbl.length > 16 ? lbl.substring(0, 14) + '…' : lbl;
-                        return {
-                          text: `${shortLbl} (${pct}%)`,
-                          fillStyle: data.datasets[0].backgroundColor[i],
-                          strokeStyle: '#fff',
-                          lineWidth: 1,
-                          index: i
-                        };
-                      });
-                    }
-                    return [];
-                  }
-                }
-              },
-              tooltip: {
-                backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                titleFont: { family: 'Inter', size: 12, weight: 'bold' },
-                bodyFont: { family: 'Inter', size: 12 },
-                padding: 10,
-                callbacks: {
-                  label: ctx => {
-                    const cnt = ctx.parsed || 0;
-                    const pct = totalFiltered > 0 ? ((cnt / totalFiltered) * 100).toFixed(1) : '0.0';
-                    return ` ${cnt.toLocaleString()} isolates (${pct}%)`;
-                  }
-                }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              font: { family: 'Inter', size: 11 },
+              color: '#475569',
+              maxRotation: 40,
+              minRotation: 0,
+              callback: function (val, index) {
+                const raw = labels[index] || '';
+                return raw.length > 20 ? raw.substring(0, 18) + '…' : raw;
               }
-            },
-            cutout: '58%'
+            }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(226, 232, 240, 0.8)' },
+            ticks: {
+              font: { family: 'JetBrains Mono', size: 11 },
+              color: '#64748b',
+              precision: 0
+            }
           }
-        });
+        }
       }
-    }
+    });
+  }
 
-    // ── Isolates table ──
-    async function loadIsolates(page = 1) {
-      state.isolatesPage = page;
-      const search = encodeURIComponent(document.getElementById('isolates-search').value);
-      const org = encodeURIComponent(document.getElementById('isolates-org-filter').value);
-      const ward = encodeURIComponent(document.getElementById('isolates-ward-filter').value);
-      const data = await api(`/api/isolates?page=${page}&pageSize=50&search=${search}&organism=${org}&ward=${ward}`);
-      if (data.error) return toast(data.error, 'error');
+  // ── Render Pie / Doughnut Chart ──
+  const pieCanvas = document.getElementById('dashboard-pie-chart');
+  if (pieCanvas) {
+    const pieCtx = pieCanvas.getContext('2d');
+    if (pieChartInstance) pieChartInstance.destroy();
 
-      document.getElementById('isolates-count').textContent = `${data.totalCount.toLocaleString()} records`;
-      document.getElementById('isolates-table-body').innerHTML = renderIsolatesTable(data.rows);
-      renderPagination('isolates-pagination', page, data.totalCount, 50, loadIsolates);
-    }
+    pieChartInstance = new Chart(pieCtx, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{
+          data: counts,
+          backgroundColor: bgColors,
+          borderColor: '#ffffff',
+          borderWidth: 2,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: {
+              boxWidth: 12,
+              boxHeight: 12,
+              padding: 8,
+              font: { family: 'Inter', size: 11 },
+              color: '#334155',
+              generateLabels: function (chart) {
+                const data = chart.data;
+                if (data.labels.length && data.datasets.length) {
+                  return data.labels.map((lbl, i) => {
+                    const val = data.datasets[0].data[i] || 0;
+                    const pct = totalFiltered > 0 ? ((val / totalFiltered) * 100).toFixed(1) : 0;
+                    const shortLbl = lbl.length > 16 ? lbl.substring(0, 14) + '…' : lbl;
+                    return {
+                      text: `${shortLbl} (${pct}%)`,
+                      fillStyle: data.datasets[0].backgroundColor[i],
+                      strokeStyle: '#fff',
+                      lineWidth: 1,
+                      index: i
+                    };
+                  });
+                }
+                return [];
+              }
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            titleFont: { family: 'Inter', size: 12, weight: 'bold' },
+            bodyFont: { family: 'Inter', size: 12 },
+            padding: 10,
+            callbacks: {
+              label: ctx => {
+                const cnt = ctx.parsed || 0;
+                const pct = totalFiltered > 0 ? ((cnt / totalFiltered) * 100).toFixed(1) : '0.0';
+                return ` ${cnt.toLocaleString()} isolates (${pct}%)`;
+              }
+            }
+          }
+        },
+        cutout: '58%'
+      }
+    });
+  }
+}
 
-    function renderIsolatesTable(rows) {
-      if (!rows.length) return `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No records found</div></div>`;
-      return `<table>
+// ── Isolates table ──
+async function loadIsolates(page = 1) {
+  state.isolatesPage = page;
+  const search = encodeURIComponent(document.getElementById('isolates-search').value);
+  const org = encodeURIComponent(document.getElementById('isolates-org-filter').value);
+  const ward = encodeURIComponent(document.getElementById('isolates-ward-filter').value);
+  const data = await api(`/api/isolates?page=${page}&pageSize=50&search=${search}&organism=${org}&ward=${ward}`);
+  if (data.error) return toast(data.error, 'error');
+
+  document.getElementById('isolates-count').textContent = `${data.totalCount.toLocaleString()} records`;
+  document.getElementById('isolates-table-body').innerHTML = renderIsolatesTable(data.rows);
+  renderPagination('isolates-pagination', page, data.totalCount, 50, loadIsolates);
+}
+
+function renderIsolatesTable(rows) {
+  if (!rows.length) return `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No records found</div></div>`;
+  return `<table>
     <thead><tr>
       <th>Row</th><th>Specimen #</th><th>Date</th><th>Type</th><th>Organism</th>
       <th>Sex</th><th>Age</th><th>Ward</th><th>ESBL</th><th>Carbapenem</th><th>MRSA</th><th>Actions</th>
@@ -1181,88 +1181,88 @@ function handleFileDrop(e) {
     </tr>`).join('')}
     </tbody>
   </table>`;
-    }
+}
 
-    // ── Fix casing ──
-    async function fixCasingAndRefresh() {
-      const data = await api('/api/bulk-fix', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operation: 'upper_spec_num' })
-      });
-      if (data.error) return toast(data.error, 'error');
-      if (data.changes === 0) {
-        toast('All SPEC_NUMs are already uppercase', 'info');
-      } else {
-        toast(`✓ Normalized ${data.changes} SPEC_NUM(s) to UPPERCASE`, 'success');
-      }
-      document.getElementById('casing-banner').style.display = 'none';
-      loadStats();
-      loadDuplicates(state.dupsPage);
-    }
+// ── Fix casing ──
+async function fixCasingAndRefresh() {
+  const data = await api('/api/bulk-fix', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ operation: 'upper_spec_num' })
+  });
+  if (data.error) return toast(data.error, 'error');
+  if (data.changes === 0) {
+    toast('All SPEC_NUMs are already uppercase', 'info');
+  } else {
+    toast(`✓ Normalized ${data.changes} SPEC_NUM(s) to UPPERCASE`, 'success');
+  }
+  document.getElementById('casing-banner').style.display = 'none';
+  loadStats();
+  loadDuplicates(state.dupsPage);
+}
 
-    function setDupMode(mode) {
-      if (state.dupMode === mode) return;
-      state.dupMode = mode;
-      document.getElementById('mode-btn-spec').classList.toggle('active', mode === 'spec');
-      document.getElementById('mode-btn-patient').classList.toggle('active', mode === 'patient');
+function setDupMode(mode) {
+  if (state.dupMode === mode) return;
+  state.dupMode = mode;
+  document.getElementById('mode-btn-spec').classList.toggle('active', mode === 'spec');
+  document.getElementById('mode-btn-patient').classList.toggle('active', mode === 'patient');
 
-      const searchInput = document.getElementById('dup-search');
-      searchInput.placeholder = mode === 'patient'
-        ? 'Search by Patient ID or Name…'
-        : 'Search by Specimen # or Name…';
-      searchInput.value = '';
+  const searchInput = document.getElementById('dup-search');
+  searchInput.placeholder = mode === 'patient'
+    ? 'Search by Patient ID or Name…'
+    : 'Search by Specimen # or Name…';
+  searchInput.value = '';
 
-      if (state.stats) {
-        const activeCount = mode === 'patient' ? (state.stats.dupPtRows || 0) : (state.stats.dupRows || 0);
-        document.getElementById('dup-badge').textContent = activeCount;
-      }
+  if (state.stats) {
+    const activeCount = mode === 'patient' ? (state.stats.dupPtRows || 0) : (state.stats.dupRows || 0);
+    document.getElementById('dup-badge').textContent = activeCount;
+  }
 
-      loadDuplicates(1);
-    }
+  loadDuplicates(1);
+}
 
-    // ── Duplicates table ──
-    async function loadDuplicates(page = 1) {
-      state.dupsPage = page;
-      const search = encodeURIComponent(document.getElementById('dup-search').value);
-      const mode = state.dupMode;
+// ── Duplicates table ──
+async function loadDuplicates(page = 1) {
+  state.dupsPage = page;
+  const search = encodeURIComponent(document.getElementById('dup-search').value);
+  const mode = state.dupMode;
 
-      // Check for mixed-case SPEC_NUMs and show/hide warning banner
-      const casingCheck = await api('/api/custom-sql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sql: "SELECT COUNT(*) as c FROM Isolates WHERE SPEC_NUM != UPPER(SPEC_NUM) AND SPEC_NUM != ''" })
-      });
-      const hasMixedCase = casingCheck.rows?.[0]?.c > 0;
-      document.getElementById('casing-banner').style.display = hasMixedCase ? 'flex' : 'none';
+  // Check for mixed-case SPEC_NUMs and show/hide warning banner
+  const casingCheck = await api('/api/custom-sql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sql: "SELECT COUNT(*) as c FROM Isolates WHERE SPEC_NUM != UPPER(SPEC_NUM) AND SPEC_NUM != ''" })
+  });
+  const hasMixedCase = casingCheck.rows?.[0]?.c > 0;
+  document.getElementById('casing-banner').style.display = hasMixedCase ? 'flex' : 'none';
 
-      const data = await api(`/api/duplicates?page=${page}&pageSize=200&search=${search}&mode=${mode}`);
-      if (data.error) return toast(data.error, 'error');
+  const data = await api(`/api/duplicates?page=${page}&pageSize=200&search=${search}&mode=${mode}`);
+  if (data.error) return toast(data.error, 'error');
 
-      const modeLabel = mode === 'patient' ? 'Patient ID' : 'Specimen ID';
-      const groups = groupRows(data.rows, mode);
-      const groupCount = Object.keys(groups).length;
+  const modeLabel = mode === 'patient' ? 'Patient ID' : 'Specimen ID';
+  const groups = groupRows(data.rows, mode);
+  const groupCount = Object.keys(groups).length;
 
-      document.getElementById('dup-count').textContent =
-        `${data.totalCount.toLocaleString()} duplicate rows in ${groupCount.toLocaleString()} groups (grouped by ${modeLabel})`;
+  document.getElementById('dup-count').textContent =
+    `${data.totalCount.toLocaleString()} duplicate rows in ${groupCount.toLocaleString()} groups (grouped by ${modeLabel})`;
 
-      if (!data.rows.length) {
-        document.getElementById('dup-table-body').innerHTML =
-          `<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No duplicates found by ${modeLabel}!</div></div>`;
-        document.getElementById('dup-pagination').innerHTML = '';
-        return;
-      }
+  if (!data.rows.length) {
+    document.getElementById('dup-table-body').innerHTML =
+      `<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No duplicates found by ${modeLabel}!</div></div>`;
+    document.getElementById('dup-pagination').innerHTML = '';
+    return;
+  }
 
-      let html = '<div class="dup-groups">';
+  let html = '<div class="dup-groups">';
 
-      for (const [groupKey, rows] of Object.entries(groups)) {
-        const safeGroupKey = groupKey.replace(/'/g, "\\'");
-        const firstRow = rows[0];
-        const groupSubText = mode === 'patient'
-          ? (firstRow.FULL_NAME ? `Patient: ${firstRow.FULL_NAME}` : '')
-          : (firstRow.PATIENT_ID ? `Patient ID: ${firstRow.PATIENT_ID}` : '');
+  for (const [groupKey, rows] of Object.entries(groups)) {
+    const safeGroupKey = groupKey.replace(/'/g, "\\'");
+    const firstRow = rows[0];
+    const groupSubText = mode === 'patient'
+      ? (firstRow.FULL_NAME ? `Patient: ${firstRow.FULL_NAME}` : '')
+      : (firstRow.PATIENT_ID ? `Patient ID: ${firstRow.PATIENT_ID}` : '');
 
-        html += `
+    html += `
       <div class="dup-group-header">
         <span style="font-size:11px;color:var(--text3);text-transform:uppercase;font-weight:700;">${modeLabel}:</span>
         <span class="dup-group-spec">${groupKey}</span>
@@ -1276,8 +1276,8 @@ function handleFileDrop(e) {
         </tr></thead>
         <tbody>`;
 
-        rows.forEach(r => {
-          html += `
+    rows.forEach(r => {
+      html += `
         <tr class="dup-row">
           <td class="pt-name">${r.FULL_NAME || '—'}</td>
           <td class="mono" style="font-size:11px;font-weight:${mode === 'patient' ? '600' : 'normal'};color:${mode === 'patient' ? 'var(--accent)' : 'inherit'}">${r.PATIENT_ID || '—'}</td>
@@ -1293,52 +1293,52 @@ function handleFileDrop(e) {
             <button class="btn btn-danger btn-sm" onclick="deleteRowAndRefresh(${r.ROW_IDX})">✕ Delete</button>
           </td>
         </tr>`;
-        });
+    });
 
-        html += '</tbody></table>';
-      }
-      html += '</div>';
+    html += '</tbody></table>';
+  }
+  html += '</div>';
 
-      document.getElementById('dup-table-body').innerHTML = html;
-      renderPagination('dup-pagination', page, data.totalCount, 200, loadDuplicates);
-    }
+  document.getElementById('dup-table-body').innerHTML = html;
+  renderPagination('dup-pagination', page, data.totalCount, 200, loadDuplicates);
+}
 
-    function groupRows(rows, mode = state.dupMode) {
-      const groups = {};
-      for (const r of rows) {
-        const val = mode === 'patient' ? (r.PATIENT_ID || '') : (r.SPEC_NUM || '');
-        const key = val.trim().toUpperCase() || '(BLANK)';
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(r);
-      }
-      return groups;
-    }
+function groupRows(rows, mode = state.dupMode) {
+  const groups = {};
+  for (const r of rows) {
+    const val = mode === 'patient' ? (r.PATIENT_ID || '') : (r.SPEC_NUM || '');
+    const key = val.trim().toUpperCase() || '(BLANK)';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(r);
+  }
+  return groups;
+}
 
-    async function deleteRowAndRefresh(rowIdx) {
-      const data = await api('/api/delete-row', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ row_idx: rowIdx })
-      });
-      if (data.error) return toast(data.error, 'error');
-      toast(`Row #${rowIdx} deleted`, 'success');
-      loadStats();
-      loadDuplicates(state.dupsPage);
-    }
+async function deleteRowAndRefresh(rowIdx) {
+  const data = await api('/api/delete-row', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ row_idx: rowIdx })
+  });
+  if (data.error) return toast(data.error, 'error');
+  toast(`Row #${rowIdx} deleted`, 'success');
+  loadStats();
+  loadDuplicates(state.dupsPage);
+}
 
-    // ── Pagination ──
-    function renderPagination(containerId, page, total, pageSize, loadFn) {
-      const totalPages = Math.ceil(total / pageSize);
-      const el = document.getElementById(containerId);
-      if (totalPages <= 1) { el.innerHTML = `<div class="page-info">Showing ${total} records</div>`; return; }
+// ── Pagination ──
+function renderPagination(containerId, page, total, pageSize, loadFn) {
+  const totalPages = Math.ceil(total / pageSize);
+  const el = document.getElementById(containerId);
+  if (totalPages <= 1) { el.innerHTML = `<div class="page-info">Showing ${total} records</div>`; return; }
 
-      const start = (page - 1) * pageSize + 1;
-      const end = Math.min(page * pageSize, total);
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, total);
 
-      const pages = [];
-      for (let i = Math.max(1, page - 2); i <= Math.min(totalPages, page + 2); i++) pages.push(i);
+  const pages = [];
+  for (let i = Math.max(1, page - 2); i <= Math.min(totalPages, page + 2); i++) pages.push(i);
 
-      el.innerHTML = `
+  el.innerHTML = `
     <div class="page-info">Showing ${start}–${end} of ${total.toLocaleString()}</div>
     <button class="page-btn" onclick="${loadFn.name}(1)" ${page === 1 ? 'disabled' : ''}>«</button>
     <button class="page-btn" onclick="${loadFn.name}(${page - 1})" ${page === 1 ? 'disabled' : ''}>‹</button>
@@ -1346,23 +1346,23 @@ function handleFileDrop(e) {
     <button class="page-btn" onclick="${loadFn.name}(${page + 1})" ${page === totalPages ? 'disabled' : ''}>›</button>
     <button class="page-btn" onclick="${loadFn.name}(${totalPages})" ${page === totalPages ? 'disabled' : ''}>»</button>
   `;
-    }
+}
 
-    // ── Bulk fixes ──
-    async function bulkFix(op) {
-      const data = await api('/api/bulk-fix', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operation: op })
-      });
-      if (data.error) return toast(data.error, 'error');
+// ── Bulk fixes ──
+async function bulkFix(op) {
+  const data = await api('/api/bulk-fix', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ operation: op })
+  });
+  if (data.error) return toast(data.error, 'error');
 
-      toast(`✓ ${data.description}: ${data.changes} rows updated`, 'success');
+  toast(`✓ ${data.description}: ${data.changes} rows updated`, 'success');
 
-      const histEl = document.getElementById('fix-history');
-      const item = document.createElement('div');
-      item.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:12px;';
-      item.innerHTML = `
+  const histEl = document.getElementById('fix-history');
+  const item = document.createElement('div');
+  item.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:12px;';
+  item.innerHTML = `
     <span style="color:var(--green);font-size:18px">✓</span>
     <div style="flex:1">
       <div style="font-weight:600;font-size:13.5px">${data.description}</div>
@@ -1370,101 +1370,101 @@ function handleFileDrop(e) {
     </div>
     <span style="font-family:JetBrains Mono,monospace;font-size:12px;color:var(--accent2)">op: ${op}</span>
   `;
-      if (histEl.querySelector('.empty')) histEl.innerHTML = '';
-      histEl.prepend(item);
+  if (histEl.querySelector('.empty')) histEl.innerHTML = '';
+  histEl.prepend(item);
 
-      if (op === 'upper_spec_num') loadStats();
-    }
+  if (op === 'upper_spec_num') loadStats();
+}
 
-    // ── SQL Editor ──
-    function insertSQL(sql) {
-      document.getElementById('sql-input').value = sql;
-      document.getElementById('sql-result').innerHTML = '<span style="color:var(--text3)">Results will appear here…</span>';
-      document.getElementById('sql-result-table').style.display = 'none';
-    }
-    function clearSQL() {
-      document.getElementById('sql-input').value = '';
-      document.getElementById('sql-result').innerHTML = '<span style="color:var(--text3)">Results will appear here…</span>';
-      document.getElementById('sql-result-table').style.display = 'none';
-    }
-    async function runSQL() {
-      const sql = document.getElementById('sql-input').value.trim();
-      if (!sql) return;
-      const resultEl = document.getElementById('sql-result');
-      const tableEl = document.getElementById('sql-result-table');
-      resultEl.innerHTML = '<div class="loading" style="padding:12px"><div class="spinner"></div> Running…</div>';
-      resultEl.className = 'sql-result';
-      tableEl.style.display = 'none';
+// ── SQL Editor ──
+function insertSQL(sql) {
+  document.getElementById('sql-input').value = sql;
+  document.getElementById('sql-result').innerHTML = '<span style="color:var(--text3)">Results will appear here…</span>';
+  document.getElementById('sql-result-table').style.display = 'none';
+}
+function clearSQL() {
+  document.getElementById('sql-input').value = '';
+  document.getElementById('sql-result').innerHTML = '<span style="color:var(--text3)">Results will appear here…</span>';
+  document.getElementById('sql-result-table').style.display = 'none';
+}
+async function runSQL() {
+  const sql = document.getElementById('sql-input').value.trim();
+  if (!sql) return;
+  const resultEl = document.getElementById('sql-result');
+  const tableEl = document.getElementById('sql-result-table');
+  resultEl.innerHTML = '<div class="loading" style="padding:12px"><div class="spinner"></div> Running…</div>';
+  resultEl.className = 'sql-result';
+  tableEl.style.display = 'none';
 
-      const data = await api('/api/custom-sql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sql })
-      });
+  const data = await api('/api/custom-sql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sql })
+  });
 
-      if (data.error) {
-        resultEl.className = 'sql-result error';
-        resultEl.textContent = '✗ ' + data.error;
-        return;
-      }
+  if (data.error) {
+    resultEl.className = 'sql-result error';
+    resultEl.textContent = '✗ ' + data.error;
+    return;
+  }
 
-      if (data.type === 'select') {
-        resultEl.className = 'sql-result success';
-        resultEl.textContent = `✓ ${data.count} row${data.count !== 1 ? 's' : ''} returned`;
-        if (data.rows.length > 0) {
-          tableEl.style.display = 'block';
-          tableEl.innerHTML = `<table>
+  if (data.type === 'select') {
+    resultEl.className = 'sql-result success';
+    resultEl.textContent = `✓ ${data.count} row${data.count !== 1 ? 's' : ''} returned`;
+    if (data.rows.length > 0) {
+      tableEl.style.display = 'block';
+      tableEl.innerHTML = `<table>
         <thead><tr>${data.columns.map(c => `<th>${c}</th>`).join('')}</tr></thead>
         <tbody>${data.rows.slice(0, 500).map(r =>
-            `<tr>${data.columns.map(c => `<td>${r[c] ?? '—'}</td>`).join('')}</tr>`
-          ).join('')}</tbody>
+        `<tr>${data.columns.map(c => `<td>${r[c] ?? '—'}</td>`).join('')}</tr>`
+      ).join('')}</tbody>
       </table>`;
-        }
-      } else {
-        resultEl.className = 'sql-result success';
-        resultEl.textContent = `✓ ${data.changes} row${data.changes !== 1 ? 's' : ''} affected`;
-        loadStats();
-      }
     }
+  } else {
+    resultEl.className = 'sql-result success';
+    resultEl.textContent = `✓ ${data.changes} row${data.changes !== 1 ? 's' : ''} affected`;
+    loadStats();
+  }
+}
 
-    // ── Detail modal ──
-    const EDITABLE = ['SPEC_NUM', 'PATIENT_ID', 'SPEC_TYPE', 'ORGANISM', 'FULL_NAME', 'SEX', 'AGE', 'WARD', 'DEPARTMENT', 'COMMENT', 'ESBL', 'CARBAPENEM', 'MRSA', 'URINECOUNT', 'SEROTYPE', 'BETA_LACT', 'INDUC_CLI'];
+// ── Detail modal ──
+const EDITABLE = ['SPEC_NUM', 'PATIENT_ID', 'SPEC_TYPE', 'ORGANISM', 'FULL_NAME', 'SEX', 'AGE', 'WARD', 'DEPARTMENT', 'COMMENT', 'ESBL', 'CARBAPENEM', 'MRSA', 'URINECOUNT', 'SEROTYPE', 'BETA_LACT', 'INDUC_CLI'];
 
-    async function viewDetail(rowIdx) {
-      const data = await api(`/api/isolate/${rowIdx}`);
-      if (data.error) return toast(data.error, 'error');
-      const r = data.row;
+async function viewDetail(rowIdx) {
+  const data = await api(`/api/isolate/${rowIdx}`);
+  if (data.error) return toast(data.error, 'error');
+  const r = data.row;
 
-      document.getElementById('modal-title').textContent = `Isolate #${r.ROW_IDX} — ${r.SPEC_NUM || 'No Specimen #'}`;
+  document.getElementById('modal-title').textContent = `Isolate #${r.ROW_IDX} — ${r.SPEC_NUM || 'No Specimen #'}`;
 
-      const fields = [
-        ['SPEC_NUM', 'Specimen Number'], ['PATIENT_ID', 'Patient ID'], ['SPEC_DATE', 'Specimen Date'], ['SPEC_TYPE', 'Specimen Type'],
-        ['ORGANISM', 'Organism'], ['FULL_NAME', 'Full Name'], ['SEX', 'Sex'], ['AGE', 'Age'],
-        ['WARD', 'Ward'], ['DEPARTMENT', 'Department'], ['INSTITUT', 'Institution'],
-        ['DATE_ADMIS', 'Admission Date'], ['DATE_DATA', 'Entry Date'],
-        ['ESBL', 'ESBL'], ['CARBAPENEM', 'Carbapenem'], ['MRSA', 'MRSA'],
-        ['URINECOUNT', 'Urine Count'], ['SEROTYPE', 'Serotype'], ['BETA_LACT', 'Beta-Lactamase'],
-        ['INDUC_CLI', 'Inducible Clinda'], ['COMMENT', 'Comment']
-      ];
+  const fields = [
+    ['SPEC_NUM', 'Specimen Number'], ['PATIENT_ID', 'Patient ID'], ['SPEC_DATE', 'Specimen Date'], ['SPEC_TYPE', 'Specimen Type'],
+    ['ORGANISM', 'Organism'], ['FULL_NAME', 'Full Name'], ['SEX', 'Sex'], ['AGE', 'Age'],
+    ['WARD', 'Ward'], ['DEPARTMENT', 'Department'], ['INSTITUT', 'Institution'],
+    ['DATE_ADMIS', 'Admission Date'], ['DATE_DATA', 'Entry Date'],
+    ['ESBL', 'ESBL'], ['CARBAPENEM', 'Carbapenem'], ['MRSA', 'MRSA'],
+    ['URINECOUNT', 'Urine Count'], ['SEROTYPE', 'Serotype'], ['BETA_LACT', 'Beta-Lactamase'],
+    ['INDUC_CLI', 'Inducible Clinda'], ['COMMENT', 'Comment']
+  ];
 
-      document.getElementById('modal-body').innerHTML = `
+  document.getElementById('modal-body').innerHTML = `
     <div class="detail-grid">
       ${fields.map(([key, label]) => {
-        const editable = EDITABLE.includes(key);
-        let valDisplay = r[key] || '<span style=color:var(--text3)>—</span>';
-        if (key === 'ORGANISM' && r[key]) {
-          const orgName = getOrganismName(r[key]);
-          if (orgName) {
-            valDisplay = `${r[key]} <span style="font-size:12px;color:var(--text3);font-weight:normal">(${orgName})</span>`;
-          }
-        }
-        return `<div class="detail-field ${editable ? 'editable' : ''}">
+    const editable = EDITABLE.includes(key);
+    let valDisplay = r[key] || '<span style=color:var(--text3)>—</span>';
+    if (key === 'ORGANISM' && r[key]) {
+      const orgName = getOrganismName(r[key]);
+      if (orgName) {
+        valDisplay = `${r[key]} <span style="font-size:12px;color:var(--text3);font-weight:normal">(${orgName})</span>`;
+      }
+    }
+    return `<div class="detail-field ${editable ? 'editable' : ''}">
           <label>${label}${editable ? ' ✏' : ''}</label>
           ${editable
-            ? `<div class="field-val" id="fv-${rowIdx}-${key}" onclick="startEdit(${rowIdx},'${key}')">${valDisplay}</div>`
-            : `<div class="field-val">${valDisplay}</div>`}
+        ? `<div class="field-val" id="fv-${rowIdx}-${key}" onclick="startEdit(${rowIdx},'${key}')">${valDisplay}</div>`
+        : `<div class="field-val">${valDisplay}</div>`}
         </div>`;
-      }).join('')}
+  }).join('')}
     </div>
     <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:8px;">
       <button class="btn btn-danger btn-sm" onclick="confirmDeleteRow(${r.ROW_IDX}, '${r.SPEC_NUM}');closeModal()">
@@ -1473,178 +1473,178 @@ function handleFileDrop(e) {
     </div>
   `;
 
-      document.getElementById('detail-modal').classList.add('open');
-    }
+  document.getElementById('detail-modal').classList.add('open');
+}
 
-    function closeModal() { document.getElementById('detail-modal').classList.remove('open'); }
+function closeModal() { document.getElementById('detail-modal').classList.remove('open'); }
 
-    function startEdit(rowIdx, field) {
-      const el = document.getElementById(`fv-${rowIdx}-${field}`);
-      if (!el) return;
-      const current = el.textContent.trim() === '—' ? '' : el.textContent.trim();
-      el.innerHTML = `<input class="field-input" id="fi-${rowIdx}-${field}" value="${current.replace(/"/g, '&quot;')}" onblur="saveEdit(${rowIdx},'${field}')" onkeydown="if(event.key==='Enter')saveEdit(${rowIdx},'${field}');if(event.key==='Escape')cancelEdit(${rowIdx},'${field}','${current}')">`;
-      document.getElementById(`fi-${rowIdx}-${field}`).focus();
-    }
+function startEdit(rowIdx, field) {
+  const el = document.getElementById(`fv-${rowIdx}-${field}`);
+  if (!el) return;
+  const current = el.textContent.trim() === '—' ? '' : el.textContent.trim();
+  el.innerHTML = `<input class="field-input" id="fi-${rowIdx}-${field}" value="${current.replace(/"/g, '&quot;')}" onblur="saveEdit(${rowIdx},'${field}')" onkeydown="if(event.key==='Enter')saveEdit(${rowIdx},'${field}');if(event.key==='Escape')cancelEdit(${rowIdx},'${field}','${current}')">`;
+  document.getElementById(`fi-${rowIdx}-${field}`).focus();
+}
 
-    async function saveEdit(rowIdx, field) {
-      const inp = document.getElementById(`fi-${rowIdx}-${field}`);
-      if (!inp) return;
-      const value = inp.value;
-      const data = await api('/api/update-field', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ row_idx: rowIdx, field, value })
-      });
-      const el = document.getElementById(`fv-${rowIdx}-${field}`);
-      if (data.error) {
-        toast(data.error, 'error');
-        if (el) el.innerHTML = value || '<span style=color:var(--text3)>—</span>';
-      } else {
-        if (el) el.innerHTML = value || '<span style=color:var(--text3)>—</span>';
-        toast(`${field} updated`, 'success');
-      }
-    }
+async function saveEdit(rowIdx, field) {
+  const inp = document.getElementById(`fi-${rowIdx}-${field}`);
+  if (!inp) return;
+  const value = inp.value;
+  const data = await api('/api/update-field', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ row_idx: rowIdx, field, value })
+  });
+  const el = document.getElementById(`fv-${rowIdx}-${field}`);
+  if (data.error) {
+    toast(data.error, 'error');
+    if (el) el.innerHTML = value || '<span style=color:var(--text3)>—</span>';
+  } else {
+    if (el) el.innerHTML = value || '<span style=color:var(--text3)>—</span>';
+    toast(`${field} updated`, 'success');
+  }
+}
 
-    function cancelEdit(rowIdx, field, original) {
-      const el = document.getElementById(`fv-${rowIdx}-${field}`);
-      if (el) el.innerHTML = original || '<span style=color:var(--text3)>—</span>';
-    }
+function cancelEdit(rowIdx, field, original) {
+  const el = document.getElementById(`fv-${rowIdx}-${field}`);
+  if (el) el.innerHTML = original || '<span style=color:var(--text3)>—</span>';
+}
 
-    // ── Confirm modal ──
-    function confirmDeleteRow(rowIdx, specNum) {
-      document.getElementById('confirm-title').textContent = 'Delete Record';
-      document.getElementById('confirm-body').innerHTML = `
+// ── Confirm modal ──
+function confirmDeleteRow(rowIdx, specNum) {
+  document.getElementById('confirm-title').textContent = 'Delete Record';
+  document.getElementById('confirm-body').innerHTML = `
     <div class="confirm-danger">⚠️ This will permanently delete isolate <strong>#${rowIdx}</strong> (Specimen: <strong>${specNum}</strong>).<br><br>This action cannot be undone.</div>
   `;
-      state.confirmAction = async () => {
-        const data = await api('/api/delete-row', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ row_idx: rowIdx })
-        });
-        if (data.error) return toast(data.error, 'error');
-        toast(`Row #${rowIdx} deleted`, 'success');
-        loadStats();
-        loadIsolates(state.isolatesPage);
-        loadDuplicates(state.dupsPage);
-      };
-      document.getElementById('confirm-modal').classList.add('open');
-    }
+  state.confirmAction = async () => {
+    const data = await api('/api/delete-row', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ row_idx: rowIdx })
+    });
+    if (data.error) return toast(data.error, 'error');
+    toast(`Row #${rowIdx} deleted`, 'success');
+    loadStats();
+    loadIsolates(state.isolatesPage);
+    loadDuplicates(state.dupsPage);
+  };
+  document.getElementById('confirm-modal').classList.add('open');
+}
 
-    function confirmDeleteDupGroup(specNum) {
-      document.getElementById('confirm-title').textContent = 'Keep Only First Record';
-      document.getElementById('confirm-body').innerHTML = `
+function confirmDeleteDupGroup(specNum) {
+  document.getElementById('confirm-title').textContent = 'Keep Only First Record';
+  document.getElementById('confirm-body').innerHTML = `
     <div class="confirm-danger">⚠️ This will delete all <strong>duplicate records</strong> for Specimen # <strong>${specNum}</strong>, keeping only the first (lowest ROW_IDX).<br><br>This action cannot be undone.</div>
   `;
-      state.confirmAction = async () => {
-        const data = await api('/api/delete-duplicates', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ spec_num: specNum })
-        });
-        if (data.error) return toast(data.error, 'error');
-        toast(`Deleted ${data.changes} duplicate(s) for ${specNum}`, 'success');
-        loadStats();
-        loadDuplicates(state.dupsPage);
-      };
-      document.getElementById('confirm-modal').classList.add('open');
-    }
+  state.confirmAction = async () => {
+    const data = await api('/api/delete-duplicates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ spec_num: specNum })
+    });
+    if (data.error) return toast(data.error, 'error');
+    toast(`Deleted ${data.changes} duplicate(s) for ${specNum}`, 'success');
+    loadStats();
+    loadDuplicates(state.dupsPage);
+  };
+  document.getElementById('confirm-modal').classList.add('open');
+}
 
-    function confirmDeleteAllDups() {
-      const mode = state.dupMode;
-      const label = mode === 'patient' ? 'PATIENT_ID' : 'SPEC_NUM';
-      document.getElementById('confirm-title').textContent = `Delete ALL Duplicates (${mode === 'patient' ? 'by Patient ID' : 'by Specimen ID'})`;
-      document.getElementById('confirm-body').innerHTML = `
+function confirmDeleteAllDups() {
+  const mode = state.dupMode;
+  const label = mode === 'patient' ? 'PATIENT_ID' : 'SPEC_NUM';
+  document.getElementById('confirm-title').textContent = `Delete ALL Duplicates (${mode === 'patient' ? 'by Patient ID' : 'by Specimen ID'})`;
+  document.getElementById('confirm-body').innerHTML = `
     <div class="confirm-danger">⚠️ <strong>DANGER:</strong> This will delete ALL duplicate rows across the entire database, keeping only the <strong>first occurrence</strong> (lowest ROW_IDX) per ${label}.<br><br>This action is <strong>irreversible</strong>. Make sure you have a backup of the database file!</div>
   `;
-      state.confirmAction = async () => {
-        const data = await api('/api/delete-duplicates', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode })
-        });
-        if (data.error) return toast(data.error, 'error');
-        toast(`Deleted ${data.changes} duplicate rows`, 'success');
-        loadStats();
-        loadDuplicates(1);
-      };
-      document.getElementById('confirm-modal').classList.add('open');
-    }
+  state.confirmAction = async () => {
+    const data = await api('/api/delete-duplicates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode })
+    });
+    if (data.error) return toast(data.error, 'error');
+    toast(`Deleted ${data.changes} duplicate rows`, 'success');
+    loadStats();
+    loadDuplicates(1);
+  };
+  document.getElementById('confirm-modal').classList.add('open');
+}
 
-    function closeConfirm() {
-      document.getElementById('confirm-modal').classList.remove('open');
-      state.confirmAction = null;
-    }
-    async function executeConfirm() {
-      if (state.confirmAction) await state.confirmAction();
-      closeConfirm();
-    }
+function closeConfirm() {
+  document.getElementById('confirm-modal').classList.remove('open');
+  state.confirmAction = null;
+}
+async function executeConfirm() {
+  if (state.confirmAction) await state.confirmAction();
+  closeConfirm();
+}
 
-    // ── Monthly AMR Report (SAPCAR-Gujarat / National AMR Containment) ──
-    async function loadMonthlyAmrData() {
-      if (!state.currentDb) return;
-      const data = await api('/api/monthly-amr');
-      if (data.error) return toast(data.error, 'error');
+// ── Monthly AMR Report (SAPCAR-Gujarat / National AMR Containment) ──
+async function loadMonthlyAmrData() {
+  if (!state.currentDb) return;
+  const data = await api('/api/monthly-amr');
+  if (data.error) return toast(data.error, 'error');
 
-      state.monthlyAmrData = data;
-      renderAmrTable();
-    }
+  state.monthlyAmrData = data;
+  renderAmrTable();
+}
 
-    function formatAmrMonthLabel(ym) {
-      if (!ym) return '—';
-      const [yr, mo] = ym.split('-');
-      const dateObj = new Date(parseInt(yr), parseInt(mo) - 1, 1);
-      return dateObj.toLocaleString('en-US', { month: 'short' }) + ', ' + yr;
-    }
+function formatAmrMonthLabel(ym) {
+  if (!ym) return '—';
+  const [yr, mo] = ym.split('-');
+  const dateObj = new Date(parseInt(yr), parseInt(mo) - 1, 1);
+  return dateObj.toLocaleString('en-US', { month: 'short' }) + ', ' + yr;
+}
 
-    function renderAmrTable() {
-      const data = state.monthlyAmrData;
-      if (!data || !data.monthlyData || !data.monthlyData.length) {
-        document.getElementById('amr-table-body').innerHTML = `
+function renderAmrTable() {
+  const data = state.monthlyAmrData;
+  if (!data || !data.monthlyData || !data.monthlyData.length) {
+    document.getElementById('amr-table-body').innerHTML = `
           <tr><td colspan="23" style="padding:24px;text-align:center;color:var(--text3);">No monthly records found</td></tr>
         `;
-        return;
-      }
+    return;
+  }
 
-      // Grand totals across all months
-      const totals = {
-        srcSamples: { opd: 0, ipd: 0, icu: 0, others: 0, total: 0 },
-        srcPositives: { opd: 0, ipd: 0, icu: 0, others: 0, total: 0 },
-        typeSamples: { blood: 0, pus: 0, sputum: 0, urine: 0, others: 0, total: 0 },
-        typePositives: { blood: 0, pus: 0, sputum: 0, urine: 0, others: 0, total: 0 }
-      };
+  // Grand totals across all months
+  const totals = {
+    srcSamples: { opd: 0, ipd: 0, icu: 0, others: 0, total: 0 },
+    srcPositives: { opd: 0, ipd: 0, icu: 0, others: 0, total: 0 },
+    typeSamples: { blood: 0, pus: 0, sputum: 0, urine: 0, others: 0, total: 0 },
+    typePositives: { blood: 0, pus: 0, sputum: 0, urine: 0, others: 0, total: 0 }
+  };
 
-      const rowsHtml = data.monthlyData.map(m => {
-        // Accumulate totals
-        totals.srcSamples.opd += m.srcSamples.opd;
-        totals.srcSamples.ipd += m.srcSamples.ipd;
-        totals.srcSamples.icu += m.srcSamples.icu;
-        totals.srcSamples.others += m.srcSamples.others;
-        totals.srcSamples.total += m.srcSamples.total;
+  const rowsHtml = data.monthlyData.map(m => {
+    // Accumulate totals
+    totals.srcSamples.opd += m.srcSamples.opd;
+    totals.srcSamples.ipd += m.srcSamples.ipd;
+    totals.srcSamples.icu += m.srcSamples.icu;
+    totals.srcSamples.others += m.srcSamples.others;
+    totals.srcSamples.total += m.srcSamples.total;
 
-        totals.srcPositives.opd += m.srcPositives.opd;
-        totals.srcPositives.ipd += m.srcPositives.ipd;
-        totals.srcPositives.icu += m.srcPositives.icu;
-        totals.srcPositives.others += m.srcPositives.others;
-        totals.srcPositives.total += m.srcPositives.total;
+    totals.srcPositives.opd += m.srcPositives.opd;
+    totals.srcPositives.ipd += m.srcPositives.ipd;
+    totals.srcPositives.icu += m.srcPositives.icu;
+    totals.srcPositives.others += m.srcPositives.others;
+    totals.srcPositives.total += m.srcPositives.total;
 
-        totals.typeSamples.blood += m.typeSamples.blood;
-        totals.typeSamples.pus += m.typeSamples.pus;
-        totals.typeSamples.sputum += m.typeSamples.sputum;
-        totals.typeSamples.urine += m.typeSamples.urine;
-        totals.typeSamples.others += m.typeSamples.others;
-        totals.typeSamples.total += m.typeSamples.total;
+    totals.typeSamples.blood += m.typeSamples.blood;
+    totals.typeSamples.pus += m.typeSamples.pus;
+    totals.typeSamples.sputum += m.typeSamples.sputum;
+    totals.typeSamples.urine += m.typeSamples.urine;
+    totals.typeSamples.others += m.typeSamples.others;
+    totals.typeSamples.total += m.typeSamples.total;
 
-        totals.typePositives.blood += m.typePositives.blood;
-        totals.typePositives.pus += m.typePositives.pus;
-        totals.typePositives.sputum += m.typePositives.sputum;
-        totals.typePositives.urine += m.typePositives.urine;
-        totals.typePositives.others += m.typePositives.others;
-        totals.typePositives.total += m.typePositives.total;
+    totals.typePositives.blood += m.typePositives.blood;
+    totals.typePositives.pus += m.typePositives.pus;
+    totals.typePositives.sputum += m.typePositives.sputum;
+    totals.typePositives.urine += m.typePositives.urine;
+    totals.typePositives.others += m.typePositives.others;
+    totals.typePositives.total += m.typePositives.total;
 
-        const monthLabel = formatAmrMonthLabel(m.month);
+    const monthLabel = formatAmrMonthLabel(m.month);
 
-        return `
+    return `
           <tr class="amr-data-row">
             <td class="td-month">
               ${monthLabel}
@@ -1681,10 +1681,10 @@ function handleFileDrop(e) {
             <td class="td-num td-total-pos">${m.typePositives.total}</td>
           </tr>
         `;
-      }).join('');
+  }).join('');
 
-      // Summary total row
-      const totalRowHtml = `
+  // Summary total row
+  const totalRowHtml = `
         <tr class="amr-summary-row">
           <td class="td-summary-label">Overall Total</td>
 
@@ -1720,305 +1720,305 @@ function handleFileDrop(e) {
         </tr>
       `;
 
-      document.getElementById('amr-table-body').innerHTML = rowsHtml + totalRowHtml;
+  document.getElementById('amr-table-body').innerHTML = rowsHtml + totalRowHtml;
+}
+
+const AMR_HEADERS = [
+  'Month, Year',
+  'Total samples (Source: OPD)',
+  'Total samples (Source: IPD)',
+  'Total samples (Source: ICU)',
+  'Total samples (Source: Others)',
+  'Total samples (Source: Total)',
+  'Culture Positive (Source: OPD)',
+  'Culture Positive (Source: IPD)',
+  'Culture Positive (Source: ICU)',
+  'Culture Positive (Source: Others)',
+  'Culture Positive (Source: Total)',
+  'Total samples (Type: Blood)',
+  'Total samples (Type: Pus)',
+  'Total samples (Type: Sputum)',
+  'Total samples (Type: Urine)',
+  'Total samples (Type: Others)',
+  'Total samples (Type: Total)',
+  'Culture Positive (Type: Blood)',
+  'Culture Positive (Type: Pus)',
+  'Culture Positive (Type: Sputum)',
+  'Culture Positive (Type: Urine)',
+  'Culture Positive (Type: Others)',
+  'Culture Positive (Type: Total)'
+];
+
+function getAmrRowsData() {
+  const data = state.monthlyAmrData;
+  if (!data || !data.monthlyData) return [];
+  return data.monthlyData.map(m => [
+    formatAmrMonthLabel(m.month),
+    m.srcSamples.opd, m.srcSamples.ipd, m.srcSamples.icu, m.srcSamples.others, m.srcSamples.total,
+    m.srcPositives.opd, m.srcPositives.ipd, m.srcPositives.icu, m.srcPositives.others, m.srcPositives.total,
+    m.typeSamples.blood, m.typeSamples.pus, m.typeSamples.sputum, m.typeSamples.urine, m.typeSamples.others, m.typeSamples.total,
+    m.typePositives.blood, m.typePositives.pus, m.typePositives.sputum, m.typePositives.urine, m.typePositives.others, m.typePositives.total
+  ]);
+}
+
+function copyAmrTableTsv() {
+  const rows = getAmrRowsData();
+  if (!rows.length) return toast('No AMR data loaded', 'error');
+
+  const allRows = [AMR_HEADERS, ...rows];
+  const tsv = allRows.map(r => r.join('\t')).join('\n');
+
+  navigator.clipboard.writeText(tsv).then(() => {
+    toast('✓ Copied all monthly AMR data to clipboard (ready for Excel / Sheets)', 'success');
+  }).catch(() => {
+    prompt('Copy this TSV table:', tsv);
+  });
+}
+
+function exportAmrCsv() {
+  const rows = getAmrRowsData();
+  if (!rows.length) return toast('No AMR data loaded', 'error');
+
+  const csvContent = [
+    AMR_HEADERS.map(h => `"${h}"`).join(','),
+    ...rows.map(r => r.map(v => typeof v === 'string' ? `"${v}"` : v).join(','))
+  ].join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Monthly_AMR_Surveillance_Report_${state.currentDb || 'WHONET'}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✓ Exported all months AMR CSV', 'success');
+}
+
+// ── Launch Flow: Disclaimer -> Data Source Selection (Path list OR Upload) ──
+function checkNoticeModal() {
+  // Open disclaimer modal on launch
+  document.getElementById('disclaimer-modal').classList.add('open');
+}
+
+function proceedToDataSourceModal() {
+  document.getElementById('disclaimer-modal').classList.remove('open');
+  renderLaunchDbSelect();
+  document.getElementById('source-modal').classList.add('open');
+}
+
+function renderLaunchDbSelect() {
+  const sel = document.getElementById('launch-db-select');
+  const localOption = document.getElementById('launch-option-local');
+  const btnPickFolder = document.getElementById('btn-pick-folder');
+  const btnOpenLaunch = document.getElementById('btn-open-launch-file');
+
+  if (state.isWasmMode) {
+    if (localOption) {
+      localOption.style.opacity = '1';
+    }
+    if (btnPickFolder) {
+      btnPickFolder.style.display = 'inline-flex';
     }
 
-    const AMR_HEADERS = [
-      'Month, Year',
-      'Total samples (Source: OPD)',
-      'Total samples (Source: IPD)',
-      'Total samples (Source: ICU)',
-      'Total samples (Source: Others)',
-      'Total samples (Source: Total)',
-      'Culture Positive (Source: OPD)',
-      'Culture Positive (Source: IPD)',
-      'Culture Positive (Source: ICU)',
-      'Culture Positive (Source: Others)',
-      'Culture Positive (Source: Total)',
-      'Total samples (Type: Blood)',
-      'Total samples (Type: Pus)',
-      'Total samples (Type: Sputum)',
-      'Total samples (Type: Urine)',
-      'Total samples (Type: Others)',
-      'Total samples (Type: Total)',
-      'Culture Positive (Type: Blood)',
-      'Culture Positive (Type: Pus)',
-      'Culture Positive (Type: Sputum)',
-      'Culture Positive (Type: Urine)',
-      'Culture Positive (Type: Others)',
-      'Culture Positive (Type: Total)'
-    ];
+    // Filter local non-sample dbs
+    const localDbs = (state.databases || []).filter(db => !db.toLowerCase().startsWith('who-tst'));
 
-    function getAmrRowsData() {
-      const data = state.monthlyAmrData;
-      if (!data || !data.monthlyData) return [];
-      return data.monthlyData.map(m => [
-        formatAmrMonthLabel(m.month),
-        m.srcSamples.opd, m.srcSamples.ipd, m.srcSamples.icu, m.srcSamples.others, m.srcSamples.total,
-        m.srcPositives.opd, m.srcPositives.ipd, m.srcPositives.icu, m.srcPositives.others, m.srcPositives.total,
-        m.typeSamples.blood, m.typeSamples.pus, m.typeSamples.sputum, m.typeSamples.urine, m.typeSamples.others, m.typeSamples.total,
-        m.typePositives.blood, m.typePositives.pus, m.typePositives.sputum, m.typePositives.urine, m.typePositives.others, m.typePositives.total
-      ]);
+    if (!localDbs.length) {
+      document.getElementById('launch-local-desc').innerHTML =
+        '<span style="color:var(--text2)">Click below to select your <code>C:\\WHONET\\Data</code> folder once. Browser will automatically list and load all <code>.sqlite</code> files!</span>';
+      sel.innerHTML = '<option value="">(No folder selected yet — Click "Select WHONET Folder")</option>';
+      if (btnOpenLaunch) btnOpenLaunch.disabled = true;
+      return;
     }
 
-    function copyAmrTableTsv() {
-      const rows = getAmrRowsData();
-      if (!rows.length) return toast('No AMR data loaded', 'error');
+    document.getElementById('launch-local-desc').innerHTML =
+      `Folder loaded: <strong>${localDbs.length} database file(s)</strong> available. Select one to open:`;
+    if (btnOpenLaunch) btnOpenLaunch.disabled = false;
+    sel.innerHTML = localDbs.map(db =>
+      `<option value="${db}" ${db === state.currentDb ? 'selected' : ''}>${db}</option>`
+    ).join('');
+    return;
+  }
 
-      const allRows = [AMR_HEADERS, ...rows];
-      const tsv = allRows.map(r => r.join('\t')).join('\n');
+  // Local Server mode
+  if (btnPickFolder) btnPickFolder.style.display = 'none';
+  if (btnOpenLaunch) btnOpenLaunch.disabled = false;
+  const localDbs = (state.databases || []).filter(db => !db.toLowerCase().startsWith('who-tst'));
+  if (!localDbs.length) {
+    sel.innerHTML = '<option value="">No laboratory .sqlite files found in C:\\WHONET\\Data</option>';
+    return;
+  }
+  sel.innerHTML = localDbs.map(db =>
+    `<option value="${db}" ${db === state.currentDb ? 'selected' : ''}>${db}</option>`
+  ).join('');
+}
 
-      navigator.clipboard.writeText(tsv).then(() => {
-        toast('✓ Copied all monthly AMR data to clipboard (ready for Excel / Sheets)', 'success');
-      }).catch(() => {
-        prompt('Copy this TSV table:', tsv);
+// Direct folder picker for Web / Vercel mode using File System Access API
+async function chooseWhonetFolder() {
+  if ('showDirectoryPicker' in window) {
+    try {
+      const dirHandle = await window.showDirectoryPicker({
+        id: 'whonet_data_dir',
+        startIn: 'documents'
       });
-    }
+      state.dirHandle = dirHandle;
+      toast('Scanning selected folder for .sqlite files…', 'info');
 
-    function exportAmrCsv() {
-      const rows = getAmrRowsData();
-      if (!rows.length) return toast('No AMR data loaded', 'error');
-
-      const csvContent = [
-        AMR_HEADERS.map(h => `"${h}"`).join(','),
-        ...rows.map(r => r.map(v => typeof v === 'string' ? `"${v}"` : v).join(','))
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Monthly_AMR_Surveillance_Report_${state.currentDb || 'WHONET'}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast('✓ Exported all months AMR CSV', 'success');
-    }
-
-    // ── Launch Flow: Disclaimer -> Data Source Selection (Path list OR Upload) ──
-    function checkNoticeModal() {
-      // Open disclaimer modal on launch
-      document.getElementById('disclaimer-modal').classList.add('open');
-    }
-
-    function proceedToDataSourceModal() {
-      document.getElementById('disclaimer-modal').classList.remove('open');
-      renderLaunchDbSelect();
-      document.getElementById('source-modal').classList.add('open');
-    }
-
-    function renderLaunchDbSelect() {
-      const sel = document.getElementById('launch-db-select');
-      const localOption = document.getElementById('launch-option-local');
-      const btnPickFolder = document.getElementById('btn-pick-folder');
-      const btnOpenLaunch = document.getElementById('btn-open-launch-file');
-
-      if (state.isWasmMode) {
-        if (localOption) {
-          localOption.style.opacity = '1';
-        }
-        if (btnPickFolder) {
-          btnPickFolder.style.display = 'inline-flex';
-        }
-
-        // Filter local non-sample dbs
-        const localDbs = (state.databases || []).filter(db => !db.toLowerCase().startsWith('who-tst'));
-
-        if (!localDbs.length) {
-          document.getElementById('launch-local-desc').innerHTML =
-            '<span style="color:var(--text2)">Click below to select your <code>C:\\WHONET\\Data</code> folder once. Browser will automatically list and load all <code>.sqlite</code> files!</span>';
-          sel.innerHTML = '<option value="">(No folder selected yet — Click "Select WHONET Folder")</option>';
-          if (btnOpenLaunch) btnOpenLaunch.disabled = true;
-          return;
-        }
-
-        document.getElementById('launch-local-desc').innerHTML =
-          `Folder loaded: <strong>${localDbs.length} database file(s)</strong> available. Select one to open:`;
-        if (btnOpenLaunch) btnOpenLaunch.disabled = false;
-        sel.innerHTML = localDbs.map(db =>
-          `<option value="${db}" ${db === state.currentDb ? 'selected' : ''}>${db}</option>`
-        ).join('');
-        return;
-      }
-
-      // Local Server mode
-      if (btnPickFolder) btnPickFolder.style.display = 'none';
-      if (btnOpenLaunch) btnOpenLaunch.disabled = false;
-      const localDbs = (state.databases || []).filter(db => !db.toLowerCase().startsWith('who-tst'));
-      if (!localDbs.length) {
-        sel.innerHTML = '<option value="">No laboratory .sqlite files found in C:\\WHONET\\Data</option>';
-        return;
-      }
-      sel.innerHTML = localDbs.map(db =>
-        `<option value="${db}" ${db === state.currentDb ? 'selected' : ''}>${db}</option>`
-      ).join('');
-    }
-
-    // Direct folder picker for Web / Vercel mode using File System Access API
-    async function chooseWhonetFolder() {
-      if ('showDirectoryPicker' in window) {
-        try {
-          const dirHandle = await window.showDirectoryPicker({
-            id: 'whonet_data_dir',
-            startIn: 'documents'
-          });
-          state.dirHandle = dirHandle;
-          toast('Scanning selected folder for .sqlite files…', 'info');
-
-          const foundFiles = [];
-          for await (const entry of dirHandle.values()) {
-            if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.sqlite')) {
-              state.fileHandles[entry.name] = entry;
-              foundFiles.push(entry.name);
-            }
-          }
-
-          foundFiles.sort();
-          if (!foundFiles.length) {
-            return toast('No .sqlite files found in the selected folder.', 'error');
-          }
-
-          // Register in database list
-          foundFiles.forEach(f => {
-            if (!state.databases.includes(f)) {
-              state.databases.push(f);
-            }
-          });
-
-          renderLaunchDbSelect();
-          renderDbSelector();
-          toast(`✓ Found ${foundFiles.length} WHONET database(s)! Select one to open.`, 'success');
-        } catch (err) {
-          if (err.name !== 'AbortError') {
-            toast(`Failed to read folder: ${err.message}`, 'error');
-          }
-        }
-      } else {
-        // Fallback for browsers without showDirectoryPicker (Firefox/Safari)
-        const input = document.getElementById('folder-input-fallback');
-        if (input) input.click();
-      }
-    }
-
-    async function handleFolderSelected(files) {
-      if (!files || !files.length) return;
       const foundFiles = [];
-      for (const file of files) {
-        if (file.name.toLowerCase().endsWith('.sqlite')) {
-          state.fileHandles[file.name] = file;
-          foundFiles.push(file.name);
-          if (!state.databases.includes(file.name)) {
-            state.databases.push(file.name);
-          }
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.sqlite')) {
+          state.fileHandles[entry.name] = entry;
+          foundFiles.push(entry.name);
         }
       }
+
       foundFiles.sort();
       if (!foundFiles.length) {
         return toast('No .sqlite files found in the selected folder.', 'error');
       }
+
+      // Register in database list
+      foundFiles.forEach(f => {
+        if (!state.databases.includes(f)) {
+          state.databases.push(f);
+        }
+      });
+
       renderLaunchDbSelect();
       renderDbSelector();
-      toast(`✓ Found ${foundFiles.length} WHONET database(s)!`, 'success');
-    }
-
-    async function selectFromLaunchList() {
-      const sel = document.getElementById('launch-db-select');
-      const filename = sel.value;
-      if (!filename) return toast('Please select a file from the list', 'error');
-
-      if (state.isWasmMode) {
-        const handleOrFile = state.fileHandles[filename];
-        if (handleOrFile) {
-          document.getElementById('source-modal').classList.remove('open');
-          if (typeof handleOrFile.getFile === 'function') {
-            const file = await handleOrFile.getFile();
-            await handleFileUpload(file, handleOrFile);
-          } else {
-            await handleFileUpload(handleOrFile, null);
-          }
-          return;
-        }
-        return toast('Please select your .sqlite file using Option 2 (Browse / Upload)', 'info');
+      toast(`✓ Found ${foundFiles.length} WHONET database(s)! Select one to open.`, 'success');
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        toast(`Failed to read folder: ${err.message}`, 'error');
       }
-
-      await switchDb(filename);
-      document.getElementById('source-modal').classList.remove('open');
     }
+  } else {
+    // Fallback for browsers without showDirectoryPicker (Firefox/Safari)
+    const input = document.getElementById('folder-input-fallback');
+    if (input) input.click();
+  }
+}
 
-    async function openPathFromLaunch() {
-      document.getElementById('source-modal').classList.remove('open');
-      await openPathPrompt();
+async function handleFolderSelected(files) {
+  if (!files || !files.length) return;
+  const foundFiles = [];
+  for (const file of files) {
+    if (file.name.toLowerCase().endsWith('.sqlite')) {
+      state.fileHandles[file.name] = file;
+      foundFiles.push(file.name);
+      if (!state.databases.includes(file.name)) {
+        state.databases.push(file.name);
+      }
     }
+  }
+  foundFiles.sort();
+  if (!foundFiles.length) {
+    return toast('No .sqlite files found in the selected folder.', 'error');
+  }
+  renderLaunchDbSelect();
+  renderDbSelector();
+  toast(`✓ Found ${foundFiles.length} WHONET database(s)!`, 'success');
+}
 
-    async function triggerBrowseFile() {
-      if ('showOpenFilePicker' in window) {
-        try {
-          const [fileHandle] = await window.showOpenFilePicker({
-            types: [{
-              description: 'WHONET SQLite Database',
-              accept: { 'application/x-sqlite3': ['.sqlite'] }
-            }],
-            multiple: false
-          });
-          const file = await fileHandle.getFile();
-          document.getElementById('source-modal').classList.remove('open');
-          await handleFileUpload(file, fileHandle);
-        } catch (err) {
-          if (err.name !== 'AbortError') {
-            toast(`Failed to open file: ${err.message}`, 'error');
-          }
-        }
+async function selectFromLaunchList() {
+  const sel = document.getElementById('launch-db-select');
+  const filename = sel.value;
+  if (!filename) return toast('Please select a file from the list', 'error');
+
+  if (state.isWasmMode) {
+    const handleOrFile = state.fileHandles[filename];
+    if (handleOrFile) {
+      document.getElementById('source-modal').classList.remove('open');
+      if (typeof handleOrFile.getFile === 'function') {
+        const file = await handleOrFile.getFile();
+        await handleFileUpload(file, handleOrFile);
       } else {
-        const input = document.getElementById('launch-file-input');
-        if (input) input.click();
+        await handleFileUpload(handleOrFile, null);
       }
+      return;
     }
+    return toast('Please select your .sqlite file using Option 2 (Browse / Upload)', 'info');
+  }
 
-    async function handleLaunchFileUpload(file) {
-      if (!file) return;
+  await switchDb(filename);
+  document.getElementById('source-modal').classList.remove('open');
+}
+
+async function openPathFromLaunch() {
+  document.getElementById('source-modal').classList.remove('open');
+  await openPathPrompt();
+}
+
+async function triggerBrowseFile() {
+  if ('showOpenFilePicker' in window) {
+    try {
+      const [fileHandle] = await window.showOpenFilePicker({
+        types: [{
+          description: 'WHONET SQLite Database',
+          accept: { 'application/x-sqlite3': ['.sqlite'] }
+        }],
+        multiple: false
+      });
+      const file = await fileHandle.getFile();
       document.getElementById('source-modal').classList.remove('open');
-      await handleFileUpload(file);
+      await handleFileUpload(file, fileHandle);
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        toast(`Failed to open file: ${err.message}`, 'error');
+      }
     }
+  } else {
+    const input = document.getElementById('launch-file-input');
+    if (input) input.click();
+  }
+}
 
-    async function loadSampleFromLaunch(sampleFilename) {
-      document.getElementById('source-modal').classList.remove('open');
-      await loadSampleDatabase(sampleFilename);
-    }
+async function handleLaunchFileUpload(file) {
+  if (!file) return;
+  document.getElementById('source-modal').classList.remove('open');
+  await handleFileUpload(file);
+}
 
-    // Keyboard shortcuts
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { closeModal(); closeConfirm(); }
-      if (e.key === 'F5' || (e.ctrlKey && e.key === 'Enter')) {
-        const page = document.querySelector('.page.active');
-        if (page?.id === 'page-sql') { e.preventDefault(); runSQL(); }
-      }
-    });
+async function loadSampleFromLaunch(sampleFilename) {
+  document.getElementById('source-modal').classList.remove('open');
+  await loadSampleDatabase(sampleFilename);
+}
 
-    // Close modal on overlay click
-    document.getElementById('detail-modal').addEventListener('click', e => {
-      if (e.target === document.getElementById('detail-modal')) closeModal();
-    });
-    document.getElementById('confirm-modal').addEventListener('click', e => {
-      if (e.target === document.getElementById('confirm-modal')) closeConfirm();
-    });
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closeConfirm(); }
+  if (e.key === 'F5' || (e.ctrlKey && e.key === 'Enter')) {
+    const page = document.querySelector('.page.active');
+    if (page?.id === 'page-sql') { e.preventDefault(); runSQL(); }
+  }
+});
 
-    // Window-level drag & drop support
-    window.addEventListener('dragover', e => {
-      e.preventDefault();
-      const dropzone = document.getElementById('global-dropzone');
-      if (dropzone) dropzone.classList.add('dragover');
-    });
-    window.addEventListener('dragleave', e => {
-      if (e.clientX === 0 && e.clientY === 0) {
-        const dropzone = document.getElementById('global-dropzone');
-        if (dropzone) dropzone.classList.remove('dragover');
-      }
-    });
-    window.addEventListener('drop', e => {
-      const files = e.dataTransfer?.files;
-      if (files && files.length > 0 && files[0].name.toLowerCase().endsWith('.sqlite')) {
-        handleFileDrop(e);
-      }
-    });
+// Close modal on overlay click
+document.getElementById('detail-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('detail-modal')) closeModal();
+});
+document.getElementById('confirm-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('confirm-modal')) closeConfirm();
+});
 
-    init();
-    checkNoticeModal();
+// Window-level drag & drop support
+window.addEventListener('dragover', e => {
+  e.preventDefault();
+  const dropzone = document.getElementById('global-dropzone');
+  if (dropzone) dropzone.classList.add('dragover');
+});
+window.addEventListener('dragleave', e => {
+  if (e.clientX === 0 && e.clientY === 0) {
+    const dropzone = document.getElementById('global-dropzone');
+    if (dropzone) dropzone.classList.remove('dragover');
+  }
+});
+window.addEventListener('drop', e => {
+  const files = e.dataTransfer?.files;
+  if (files && files.length > 0 && files[0].name.toLowerCase().endsWith('.sqlite')) {
+    handleFileDrop(e);
+  }
+});
+
+init();
+checkNoticeModal();
