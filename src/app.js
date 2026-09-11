@@ -699,7 +699,7 @@ async function loadSampleDatabase(sampleFilename) {
 
     renderDbSelector();
     const count = wasmSelect('SELECT COUNT(*) as c FROM Isolates')[0]?.c || 0;
-    toast(`✓ Loaded sample ${sampleFilename} (${count.toLocaleString()} records)`, 'success');
+    toast(`Loaded sample ${sampleFilename} (${count.toLocaleString()} records)`, 'success');
     loadStats();
   } catch (err) {
     toast(`Failed to load sample database: ${err.message}`, 'error');
@@ -728,7 +728,7 @@ async function handleFileUpload(file, fileHandle = null) {
       if (data.databases) state.databases = data.databases;
       state.currentDb = data.filename;
       renderDbSelector();
-      toast(`✓ Successfully loaded ${data.filename} (${data.count.toLocaleString()} records)`, 'success');
+      toast(`Successfully loaded ${data.filename} (${data.count.toLocaleString()} records)`, 'success');
       loadStats();
       return;
     } catch (err) {
@@ -776,7 +776,7 @@ async function handleFileUpload(file, fileHandle = null) {
 
     renderDbSelector();
     const count = wasmSelect('SELECT COUNT(*) as c FROM Isolates')[0]?.c || 0;
-    toast(`✓ Successfully loaded ${file.name} into browser (${count.toLocaleString()} records)`, 'success');
+    toast(`Successfully loaded ${file.name} into browser (${count.toLocaleString()} records)`, 'success');
     loadStats();
   } catch (err) {
     toast(`Failed to load SQLite file in browser: ${err.message}`, 'error');
