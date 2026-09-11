@@ -13,7 +13,11 @@ let state = {
   confirmAction: null,
   isWasmMode: false,
   wasmDb: null,
-  sqlJsInstance: null
+  sqlJsInstance: null,
+  dirHandle: null,
+  fileHandles: {}, // filename -> FileSystemFileHandle or File
+  activeFileHandle: null,
+  isModified: false
 };
 
 // ── Utils ──
@@ -79,7 +83,82 @@ function wasmRun(sql, params = []) {
   if (!state.wasmDb) throw new Error('No client-side SQLite database loaded');
   state.wasmDb.run(sql, params);
   const changes = state.wasmDb.getRowsModified();
+  if (changes > 0) {
+    markModified();
+  }
   return { changes };
+}
+
+function markModified() {
+  state.isModified = true;
+  const saveBtn = document.getElementById('btn-save-file');
+  if (saveBtn) {
+    if (state.activeFileHandle && typeof state.activeFileHandle.createWritable === 'function') {
+      saveBtn.style.display = 'inline-flex';
+      saveBtn.classList.remove('btn-outline');
+      saveBtn.classList.add('btn-success');
+      saveBtn.innerHTML = '💾 Save to File •';
+    }
+  }
+  const dlBtn = document.getElementById('btn-download-db');
+  if (dlBtn && state.isWasmMode) {
+    dlBtn.style.display = 'inline-flex';
+  }
+}
+
+async function saveToFileHandle() {
+  if (!state.wasmDb) return;
+  const saveBtn = document.getElementById('btn-save-file');
+  try {
+    let handle = state.activeFileHandle;
+    // If we don't have a direct file handle, or if it doesn't support writing, ask user to pick destination
+    if (!handle || typeof handle.createWritable !== 'function') {
+      if ('showSaveFilePicker' in window) {
+        handle = await window.showSaveFilePicker({
+          suggestedName: state.currentDb || 'WHONET_DATA.sqlite',
+          types: [{
+            description: 'SQLite Database',
+            accept: { 'application/x-sqlite3': ['.sqlite'] }
+          }]
+        });
+        state.activeFileHandle = handle;
+      } else {
+        // Fallback to direct export download
+        return exportSqliteDatabase();
+      }
+    }
+
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = '⏳ Saving…';
+    }
+
+    const binaryArray = state.wasmDb.export();
+    const writable = await handle.createWritable();
+    await writable.write(binaryArray);
+    await writable.close();
+
+    state.isModified = false;
+    toast(`✓ Successfully saved changes directly to ${handle.name || state.currentDb}`, 'success');
+
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '💾 Saved ✓';
+      setTimeout(() => {
+        if (!state.isModified && saveBtn) {
+          saveBtn.innerHTML = '💾 Save to File';
+        }
+      }, 2500);
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      toast(`Save failed: ${err.message}`, 'error');
+    }
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '💾 Save to File';
+    }
+  }
 }
 
 // ── Hybrid API Dispatcher (Local Node Server OR In-Browser WASM SQLite) ──
@@ -532,7 +611,21 @@ function renderDbSelector() {
 
 async function switchDb(filename) {
   if (!filename || filename === state.currentDb) return;
-  if (state.isWasmMode) return; // in WASM mode, database is uploaded via file drop/input
+
+  if (state.isWasmMode) {
+    const handleOrFile = state.fileHandles[filename];
+    if (handleOrFile) {
+      if (typeof handleOrFile.getFile === 'function') {
+        const file = await handleOrFile.getFile();
+        await handleFileUpload(file, handleOrFile);
+      } else if (handleOrFile instanceof File || handleOrFile instanceof Blob) {
+        await handleFileUpload(handleOrFile, null);
+      }
+      return;
+    }
+    // If not found in fileHandles, warn user
+    return toast(`Cannot switch to ${filename} directly without file access.`, 'info');
+  }
 
   const data = await api('/api/open-database', {
     method: 'POST',
@@ -641,7 +734,7 @@ async function loadSampleDatabase(sampleFilename) {
 }
 
 // ── Handle Upload / Drag & Drop (Supports both Local Node Server & In-Browser WASM) ──
-async function handleFileUpload(file) {
+async function handleFileUpload(file, fileHandle = null) {
   if (!file) return;
   if (!file.name.toLowerCase().endsWith('.sqlite')) {
     return toast('Please drop/upload a valid .sqlite file', 'error');
@@ -680,6 +773,10 @@ async function handleFileUpload(file) {
     state.isWasmMode = true;
     state.wasmDb = db;
     state.currentDb = file.name;
+    state.activeFileHandle = fileHandle;
+    state.fileHandles[file.name] = fileHandle || file;
+    state.isModified = false;
+
     if (!state.databases.includes(file.name)) {
       state.databases.push(file.name);
     }
@@ -689,6 +786,16 @@ async function handleFileUpload(file) {
       badge.textContent = '🌐 In-Browser WASM Mode';
       badge.style.background = 'rgba(96, 165, 250, 0.15)';
       badge.style.color = 'var(--accent)';
+    }
+
+    const saveBtn = document.getElementById('btn-save-file');
+    if (saveBtn) {
+      if (fileHandle && typeof fileHandle.createWritable === 'function') {
+        saveBtn.style.display = 'inline-flex';
+        saveBtn.innerHTML = '💾 Save to File';
+      } else {
+        saveBtn.style.display = 'none';
+      }
     }
 
     const dlBtn = document.getElementById('btn-download-db');
@@ -1702,15 +1809,40 @@ function handleFileDrop(e) {
     function renderLaunchDbSelect() {
       const sel = document.getElementById('launch-db-select');
       const localOption = document.getElementById('launch-option-local');
+      const btnPickFolder = document.getElementById('btn-pick-folder');
+      const btnOpenLaunch = document.getElementById('btn-open-launch-file');
+
       if (state.isWasmMode) {
         if (localOption) {
-          localOption.style.opacity = '0.65';
-          document.getElementById('launch-local-desc').innerHTML =
-            '<span style="color:var(--yellow)">⚠️ Running on Web/Vercel (Browser Sandbox active). Direct C:\\ drive scanning is disabled by browsers. Please use Option 2 below to browse/drop your file!</span>';
+          localOption.style.opacity = '1';
         }
-        sel.innerHTML = '<option value="">(Web mode: Use Option 2 below)</option>';
+        if (btnPickFolder) {
+          btnPickFolder.style.display = 'inline-flex';
+        }
+
+        // Filter local non-sample dbs
+        const localDbs = (state.databases || []).filter(db => !db.toLowerCase().startsWith('who-tst'));
+
+        if (!localDbs.length) {
+          document.getElementById('launch-local-desc').innerHTML =
+            '<span style="color:var(--text2)">Click below to select your <code>C:\\WHONET\\Data</code> folder once. Browser will automatically list and load all <code>.sqlite</code> files!</span>';
+          sel.innerHTML = '<option value="">(No folder selected yet — Click "Select WHONET Folder")</option>';
+          if (btnOpenLaunch) btnOpenLaunch.disabled = true;
+          return;
+        }
+
+        document.getElementById('launch-local-desc').innerHTML =
+          `Folder loaded: <strong>${localDbs.length} database file(s)</strong> available. Select one to open:`;
+        if (btnOpenLaunch) btnOpenLaunch.disabled = false;
+        sel.innerHTML = localDbs.map(db =>
+          `<option value="${db}" ${db === state.currentDb ? 'selected' : ''}>${db}</option>`
+        ).join('');
         return;
       }
+
+      // Local Server mode
+      if (btnPickFolder) btnPickFolder.style.display = 'none';
+      if (btnOpenLaunch) btnOpenLaunch.disabled = false;
       const localDbs = (state.databases || []).filter(db => !db.toLowerCase().startsWith('who-tst'));
       if (!localDbs.length) {
         sel.innerHTML = '<option value="">No laboratory .sqlite files found in C:\\WHONET\\Data</option>';
@@ -1721,13 +1853,92 @@ function handleFileDrop(e) {
       ).join('');
     }
 
-    async function selectFromLaunchList() {
-      if (state.isWasmMode) {
-        return toast('Please select your .sqlite file using Option 2 (Browse / Upload)', 'info');
+    // Direct folder picker for Web / Vercel mode using File System Access API
+    async function chooseWhonetFolder() {
+      if ('showDirectoryPicker' in window) {
+        try {
+          const dirHandle = await window.showDirectoryPicker({
+            id: 'whonet_data_dir',
+            startIn: 'documents'
+          });
+          state.dirHandle = dirHandle;
+          toast('Scanning selected folder for .sqlite files…', 'info');
+
+          const foundFiles = [];
+          for await (const entry of dirHandle.values()) {
+            if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.sqlite')) {
+              state.fileHandles[entry.name] = entry;
+              foundFiles.push(entry.name);
+            }
+          }
+
+          foundFiles.sort();
+          if (!foundFiles.length) {
+            return toast('No .sqlite files found in the selected folder.', 'error');
+          }
+
+          // Register in database list
+          foundFiles.forEach(f => {
+            if (!state.databases.includes(f)) {
+              state.databases.push(f);
+            }
+          });
+
+          renderLaunchDbSelect();
+          renderDbSelector();
+          toast(`✓ Found ${foundFiles.length} WHONET database(s)! Select one to open.`, 'success');
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            toast(`Failed to read folder: ${err.message}`, 'error');
+          }
+        }
+      } else {
+        // Fallback for browsers without showDirectoryPicker (Firefox/Safari)
+        const input = document.getElementById('folder-input-fallback');
+        if (input) input.click();
       }
+    }
+
+    async function handleFolderSelected(files) {
+      if (!files || !files.length) return;
+      const foundFiles = [];
+      for (const file of files) {
+        if (file.name.toLowerCase().endsWith('.sqlite')) {
+          state.fileHandles[file.name] = file;
+          foundFiles.push(file.name);
+          if (!state.databases.includes(file.name)) {
+            state.databases.push(file.name);
+          }
+        }
+      }
+      foundFiles.sort();
+      if (!foundFiles.length) {
+        return toast('No .sqlite files found in the selected folder.', 'error');
+      }
+      renderLaunchDbSelect();
+      renderDbSelector();
+      toast(`✓ Found ${foundFiles.length} WHONET database(s)!`, 'success');
+    }
+
+    async function selectFromLaunchList() {
       const sel = document.getElementById('launch-db-select');
       const filename = sel.value;
       if (!filename) return toast('Please select a file from the list', 'error');
+
+      if (state.isWasmMode) {
+        const handleOrFile = state.fileHandles[filename];
+        if (handleOrFile) {
+          document.getElementById('source-modal').classList.remove('open');
+          if (typeof handleOrFile.getFile === 'function') {
+            const file = await handleOrFile.getFile();
+            await handleFileUpload(file, handleOrFile);
+          } else {
+            await handleFileUpload(handleOrFile, null);
+          }
+          return;
+        }
+        return toast('Please select your .sqlite file using Option 2 (Browse / Upload)', 'info');
+      }
 
       await switchDb(filename);
       document.getElementById('source-modal').classList.remove('open');
@@ -1736,6 +1947,30 @@ function handleFileDrop(e) {
     async function openPathFromLaunch() {
       document.getElementById('source-modal').classList.remove('open');
       await openPathPrompt();
+    }
+
+    async function triggerBrowseFile() {
+      if ('showOpenFilePicker' in window) {
+        try {
+          const [fileHandle] = await window.showOpenFilePicker({
+            types: [{
+              description: 'WHONET SQLite Database',
+              accept: { 'application/x-sqlite3': ['.sqlite'] }
+            }],
+            multiple: false
+          });
+          const file = await fileHandle.getFile();
+          document.getElementById('source-modal').classList.remove('open');
+          await handleFileUpload(file, fileHandle);
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            toast(`Failed to open file: ${err.message}`, 'error');
+          }
+        }
+      } else {
+        const input = document.getElementById('launch-file-input');
+        if (input) input.click();
+      }
     }
 
     async function handleLaunchFileUpload(file) {

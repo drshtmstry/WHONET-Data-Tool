@@ -64,12 +64,21 @@
         </select>
         <button
           class="btn btn-sm btn-success"
+          id="btn-save-file"
+          onclick="saveToFileHandle()"
+          title="Save changes directly back to the original .sqlite file on disk"
+          style="display: none; padding: 5px 10px; font-size: 12px"
+        >
+          💾 Save to File
+        </button>
+        <button
+          class="btn btn-sm btn-outline"
           id="btn-download-db"
           onclick="exportSqliteDatabase()"
           title="Download / Export modified .sqlite file to your computer"
-          style="display: none; padding: 5px 10px; font-size: 12px"
+          style="display: none; padding: 5px 10px; font-size: 12px; color: #fff; border-color: rgba(255,255,255,0.2)"
         >
-          💾 Save / Download .sqlite
+          ⬇️ Export .sqlite
         </button>
         <input
           type="file"
@@ -1383,6 +1392,7 @@
                   <option value="">Scanning folder…</option>
                 </select>
                 <button
+                  id="btn-open-launch-file"
                   class="btn btn-primary btn-sm"
                   onclick="selectFromLaunchList()"
                   style="padding: 8px 16px"
@@ -1390,9 +1400,27 @@
                   Open File
                 </button>
               </div>
-              <div style="margin-top: 8px">
+              <div id="launch-dir-actions" style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+                <button
+                  type="button"
+                  id="btn-pick-folder"
+                  class="btn btn-sm btn-primary"
+                  onclick="chooseWhonetFolder()"
+                  style="padding: 6px 14px; font-size: 12px; display: none"
+                >
+                  📂 Select WHONET Folder (C:\WHONET\Data)
+                </button>
+                <input
+                  type="file"
+                  id="folder-input-fallback"
+                  webkitdirectory
+                  directory
+                  style="display: none"
+                  onchange="handleFolderSelected(this.files)"
+                />
                 <a
                   href="javascript:void(0)"
+                  id="link-custom-path"
                   onclick="openPathFromLaunch()"
                   style="
                     font-size: 11.5px;
@@ -1441,10 +1469,10 @@
               </div>
               <button
                 class="btn btn-success btn-sm"
-                onclick="document.getElementById('launch-file-input').click()"
+                onclick="triggerBrowseFile()"
                 style="padding: 8px 20px; font-size: 13px"
               >
-                📁 Browse &amp; Upload .sqlite File
+                📁 Browse &amp; Open .sqlite File
               </button>
               <input
                 type="file"
