@@ -38,8 +38,8 @@ The **WHONET Data Tool** is a web-based utility designed to inspect, deduplicate
 - **Monthly AMR Surveillance Report (SAPCAR-Gujarat / National AMR Containment)**:
   - Generates standard monthly reporting tables showing culture totals and positive cultures across source (OPD, IPD, ICU, Others) and specimen type (Blood, Pus, Sputum, Urine, Others).
   - Micro-accurate culture growth rules:
-    - **Blood (`bl`)**: Sterile / no growth excludes `xxx`, `xpa`, `xep`, `xsg`, `nor`, and skin contaminants (`scn` / CoNS). _(Oral and vaginal flora are not applicable to blood)._
-    - **Other Specimens**: Sterile / no growth excludes `xxx`, `xpa`, `xep`, `xsg`, `nor`, `ora` (oral flora), and `vag` (vaginal flora).
+    - **Blood (`bl`)**: Sterile / no growth excludes `xxx`, `xpa`, `xep`, `xsg`, `nor`, and skin contaminants (`scn` / CoNS).
+    - **Other Specimens**: Sterile / no growth excludes `xxx`, `xpa`, `xep`, `xsg`, `nor`, `ora`, and `vag`.
   - One-click **Copy Table (TSV / Excel)** and **Export All Months (CSV)**.
 - **Dynamic Visual Analytics & Charts (Bar & Pie/Doughnut)**:
   - Interactive distribution charts across key parameters: Organisms, Specimen Types, Wards, Location Types (OPD/IPD/ICU), Departments, Gender, Age Demographics, and AMR phenotypes (ESBL, Carbapenem, MRSA).
