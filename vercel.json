@@ -3,6 +3,10 @@
   "cleanUrls": true,
   "routes": [
     {
+      "src": "/sample-data/(.*)",
+      "dest": "/public/sample-data/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "/src/$1"
     }

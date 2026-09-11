@@ -22,32 +22,36 @@ Use the tool directly in your browser without any installation:
 > - **Data Quality Dependency**: Generated surveillance statistics, counts, and monthly breakdown tables depend directly on the quality, completeness, and standardization of data entered in your WHONET laboratory records (e.g., organism codes, specimen types, ward designations).
 > - **Mandatory Verification**: All generated figures and tables must be **verified manually by qualified laboratory personnel / microbiologists** before submitting to any state, national, or organizational surveillance bodies (such as SAPCAR-Gujarat, ICMR, or national AMR containment programs).
 
-## 🖥️ Standalone Windows App
+## 🖥️ Localhost Browser App
 
-For editing WHONET databases directly on a laboratory computer, use the portable Windows app. It runs locally and does not require internet access, Node.js, or a separate server window.
+The Windows workflow uses the user’s normal browser and a small local Node.js server. It provides direct access to `.sqlite` files in `C:\WHONET\Data` without bundling Electron or creating a separate application executable.
+
+Install Node.js LTS, run `Start-WHONET.bat`, and the browser opens at `http://localhost:7890`. The server only listens on `127.0.0.1`, and all database processing remains on the local computer.
+
+The localhost mode automatically discovers `.sqlite` files in `C:\WHONET\Data`, supports opening custom paths, and writes changes directly to the selected database. Keep the official WHONET application closed while modifying the same database file.
+
+### Web Deployment and File Access
+
+The deployed web app also supports browser-only SQLite processing through `sql.js` and WebAssembly:
+
+- Select a folder containing WHONET `.sqlite` files. The selected folder is remembered by the browser for future visits.
+- Browse for one specific `.sqlite` file from any folder.
+- In Chrome or Edge, save changes directly to the selected file using the browser’s file permission prompt.
+- In browsers without writable file handles, export the modified database as a new `.sqlite` download.
+
+Browsers cannot silently open an arbitrary Windows path on a first visit. The first deployed visit therefore requires selecting `C:\WHONET\Data` once; later visits can restore it when permission remains available. The deployed sample databases are served from `public/sample-data` through the Vercel routes in `vercel.json`.
 
 ### Instructions for Users
 
-1. Open the project’s **GitHub Releases** page.
-2. Download the latest `WHONET Data Tool.exe` release asset. Do not download the source-code ZIP for normal use.
-3. If Windows shows a SmartScreen message, verify that the file came from the official project release, then choose **More info** and **Run anyway**.
-4. Double-click the downloaded executable.
-5. Select a database from `C:\WHONET\Data` inside the app.
-6. Edit and save the database.
+1. Install Node.js LTS.
+2. Download or clone this project.
+3. Run `Start-WHONET.bat`.
+4. Select a database from `C:\WHONET\Data` in the browser.
+5. Edit and save the database.
 
 The app processes data locally and does not upload WHONET records. Keep a backup of important databases before making bulk changes. The official WHONET application should be closed when modifying the same database file.
 
-## 📦 Publishing a GitHub Release
-
-After running `npm run build:desktop`, upload this file as a GitHub Release asset:
-
-```text
-desktop-dist/WHONET Data Tool 1.0.0.exe
-```
-
-Do not publish WHONET `.sqlite` files, patient data, database backups, credentials, API keys, or `node_modules`. The executable contains the application only; user databases remain on the local computer.
-
-Because the executable is not code-signed, Windows may display a SmartScreen warning on first launch. Users should verify that the file was downloaded from the project’s official GitHub Release before choosing **More info** and **Run anyway**.
+No executable is required. The server runs only while the browser tool is in use and listens on `127.0.0.1`.
 
 ---
 
@@ -86,10 +90,9 @@ whonet/
 │   ├── app.js              # Client logic (Hybrid: Node API + WebAssembly sql.js)
 │   ├── styles.css           # Design system & dark theme
 │   └── vendor/              # Offline SQLite WebAssembly runtime
-├── server.js               # Zero-lock Node.js server with on-demand SQLite
-├── electron-main.cjs       # Native desktop window entry point
+├── server.js               # Localhost server with on-demand SQLite
 ├── Start-WHONET.bat        # Simple local browser launcher
-├── package.json            # Scripts & metadata
+├── package.json            # Local development and validation scripts
 ├── vercel.json             # Vercel static routing configuration
 ├── README.md               # Documentation & usage instructions
 └── .gitignore              # Ignores *.sqlite, node_modules, etc.
@@ -99,25 +102,39 @@ whonet/
 
 ## 🚀 Getting Started
 
-### Standalone Desktop Build
+### Local Browser App
 
-Install Node.js once, install the dependencies, and build the portable Windows app:
+Install Node.js LTS once, then install the dependencies:
 
 ```bash
 npm install
-npm run build:desktop
 ```
 
-The executable is created at:
+Run the local server and open the browser:
 
-```text
-desktop-dist/WHONET Data Tool 1.0.0.exe
+```bash
+npm start
 ```
 
-For local browser development, run:
+Available npm scripts:
+
+```bash
+npm start       # Start the localhost server
+npm run dev     # Start with automatic server restarts
+npm run check   # Check server and browser JavaScript syntax
+npm run build   # Run the project validation check
+```
+
+For development with automatic server restarts, run:
 
 ```bash
 npm run dev
+```
+
+To validate the project scripts, run:
+
+```bash
+npm run check
 ```
 
 Then open [http://localhost:7890](http://localhost:7890) in your browser. On Windows, `Start-WHONET.bat` starts the local server and opens the browser automatically.

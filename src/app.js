@@ -596,6 +596,7 @@ async function init() {
   const btnOpenPath = document.getElementById('btn-open-path');
   if (btnOpenPath) btnOpenPath.style.display = 'none';
   renderDbSelector();
+  await restoreWhonetFolder();
 }
 
 function renderDbSelector() {
@@ -1853,6 +1854,87 @@ function renderLaunchDbSelect() {
   ).join('');
 }
 
+async function getFolderHandleStore() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('whonet-data-tool', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('settings');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveWhonetFolderHandle(dirHandle) {
+  try {
+    const db = await getFolderHandleStore();
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction('settings', 'readwrite');
+      transaction.objectStore('settings').put(dirHandle, 'whonet-folder');
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+    });
+    db.close();
+  } catch (err) {
+    console.info('Could not remember selected folder:', err.message);
+  }
+}
+
+async function getSavedWhonetFolderHandle() {
+  try {
+    const db = await getFolderHandleStore();
+    const handle = await new Promise((resolve, reject) => {
+      const request = db.transaction('settings').objectStore('settings').get('whonet-folder');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    return handle;
+  } catch (err) {
+    console.info('Could not restore selected folder:', err.message);
+    return null;
+  }
+}
+
+async function scanWhonetFolder(dirHandle, showToast = true) {
+  state.dirHandle = dirHandle;
+  if (showToast) toast('Scanning selected folder for .sqlite files…', 'info');
+
+  const foundFiles = [];
+  for await (const entry of dirHandle.values()) {
+    if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.sqlite')) {
+      state.fileHandles[entry.name] = entry;
+      foundFiles.push(entry.name);
+    }
+  }
+
+  foundFiles.sort();
+  if (!foundFiles.length) {
+    if (showToast) toast('No .sqlite files found in the selected folder.', 'error');
+    return false;
+  }
+
+  foundFiles.forEach(f => {
+    if (!state.databases.includes(f)) state.databases.push(f);
+  });
+
+  renderLaunchDbSelect();
+  renderDbSelector();
+  if (showToast) toast(`✓ Found ${foundFiles.length} WHONET database(s)! Select one to open.`, 'success');
+  return true;
+}
+
+async function restoreWhonetFolder() {
+  if (!('showDirectoryPicker' in window)) return;
+  const dirHandle = await getSavedWhonetFolderHandle();
+  if (!dirHandle) return;
+
+  try {
+    const permission = await dirHandle.queryPermission({ mode: 'read' });
+    if (permission === 'granted') await scanWhonetFolder(dirHandle, false);
+  } catch (err) {
+    console.info('Saved folder is no longer available:', err.message);
+  }
+}
+
 // Direct folder picker for Web / Vercel mode using File System Access API
 async function chooseWhonetFolder() {
   if ('showDirectoryPicker' in window) {
@@ -1861,32 +1943,8 @@ async function chooseWhonetFolder() {
         id: 'whonet_data_dir',
         startIn: 'documents'
       });
-      state.dirHandle = dirHandle;
-      toast('Scanning selected folder for .sqlite files…', 'info');
-
-      const foundFiles = [];
-      for await (const entry of dirHandle.values()) {
-        if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.sqlite')) {
-          state.fileHandles[entry.name] = entry;
-          foundFiles.push(entry.name);
-        }
-      }
-
-      foundFiles.sort();
-      if (!foundFiles.length) {
-        return toast('No .sqlite files found in the selected folder.', 'error');
-      }
-
-      // Register in database list
-      foundFiles.forEach(f => {
-        if (!state.databases.includes(f)) {
-          state.databases.push(f);
-        }
-      });
-
-      renderLaunchDbSelect();
-      renderDbSelector();
-      toast(`✓ Found ${foundFiles.length} WHONET database(s)! Select one to open.`, 'success');
+      await saveWhonetFolderHandle(dirHandle);
+      await scanWhonetFolder(dirHandle);
     } catch (err) {
       if (err.name !== 'AbortError') {
         toast(`Failed to read folder: ${err.message}`, 'error');
@@ -1961,6 +2019,7 @@ async function triggerBrowseFile() {
       });
       const file = await fileHandle.getFile();
       document.getElementById('source-modal').classList.remove('open');
+      state.isWasmMode = true;
       await handleFileUpload(file, fileHandle);
     } catch (err) {
       if (err.name !== 'AbortError') {
