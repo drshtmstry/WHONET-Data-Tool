@@ -1,0 +1,22 @@
+{
+  "name": "whonet-data-tool",
+  "version": "1.0.0",
+  "description": "WHONET Laboratory Database Management, Deduplication & AMR Surveillance Tool",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "whonet",
+    "amr",
+    "microbiology",
+    "surveillance",
+    "sqlite",
+    "deduplication",
+    "data-quality"
+  ],
+  "author": "Dr. Darshit Mistry",
+  "license": "MIT"
+}
