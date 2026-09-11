@@ -642,7 +642,7 @@ async function switchDb(filename) {
 
 // ── Open by Custom Path ──
 async function openPathPrompt() {
-  const defaultPath = 'C:\\WHONET\\Data\\IND-BMCRI-2026.sqlite';
+  const defaultPath = 'C:\\WHONET\\Data\\';
   const inputPath = prompt('Enter the absolute path to your WHONET .sqlite database file:', defaultPath);
   if (!inputPath || !inputPath.trim()) return;
 
@@ -1821,8 +1821,7 @@ function renderLaunchDbSelect() {
       btnPickFolder.style.display = 'inline-flex';
     }
 
-    // Filter local non-sample dbs
-    const localDbs = (state.databases || []).filter(db => !db.toLowerCase().startsWith('who-tst'));
+    const localDbs = state.databases || [];
 
     if (!localDbs.length) {
       document.getElementById('launch-local-desc').innerHTML =
@@ -1844,7 +1843,7 @@ function renderLaunchDbSelect() {
   // Local Server mode
   if (btnPickFolder) btnPickFolder.style.display = 'none';
   if (btnOpenLaunch) btnOpenLaunch.disabled = false;
-  const localDbs = (state.databases || []).filter(db => !db.toLowerCase().startsWith('who-tst'));
+  const localDbs = state.databases || [];
   if (!localDbs.length) {
     sel.innerHTML = '<option value="">No laboratory .sqlite files found in C:\\WHONET\\Data</option>';
     return;
@@ -1852,6 +1851,10 @@ function renderLaunchDbSelect() {
   sel.innerHTML = localDbs.map(db =>
     `<option value="${db}" ${db === state.currentDb ? 'selected' : ''}>${db}</option>`
   ).join('');
+}
+
+function isSqliteDatabase(filename) {
+  return filename.toLowerCase().endsWith('.sqlite');
 }
 
 async function getFolderHandleStore() {
@@ -1900,7 +1903,7 @@ async function scanWhonetFolder(dirHandle, showToast = true) {
 
   const foundFiles = [];
   for await (const entry of dirHandle.values()) {
-    if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.sqlite')) {
+    if (entry.kind === 'file' && isSqliteDatabase(entry.name)) {
       state.fileHandles[entry.name] = entry;
       foundFiles.push(entry.name);
     }
@@ -1961,7 +1964,7 @@ async function handleFolderSelected(files) {
   if (!files || !files.length) return;
   const foundFiles = [];
   for (const file of files) {
-    if (file.name.toLowerCase().endsWith('.sqlite')) {
+    if (isSqliteDatabase(file.name)) {
       state.fileHandles[file.name] = file;
       foundFiles.push(file.name);
       if (!state.databases.includes(file.name)) {
