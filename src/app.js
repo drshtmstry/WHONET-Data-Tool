@@ -139,7 +139,7 @@ async function saveToFileHandle() {
     await writable.close();
 
     state.isModified = false;
-    toast(`✓ Successfully saved changes directly to ${handle.name || state.currentDb}`, 'success');
+    toast(`Successfully saved changes directly to ${handle.name || state.currentDb}`, 'success');
 
     if (saveBtn) {
       saveBtn.disabled = false;
@@ -654,7 +654,7 @@ function exportSqliteDatabase() {
     a.download = state.currentDb || 'whonet_database.sqlite';
     a.click();
     URL.revokeObjectURL(url);
-    toast(`✓ Downloaded ${state.currentDb}`, 'success');
+    toast(`Downloaded ${state.currentDb}`, 'success');
   } catch (err) {
     toast(`Export failed: ${err.message}`, 'error');
   }
@@ -1143,7 +1143,7 @@ async function fixCasingAndRefresh() {
   if (data.changes === 0) {
     toast('All SPEC_NUMs are already uppercase', 'info');
   } else {
-    toast(`✓ Normalized ${data.changes} SPEC_NUM(s) to UPPERCASE`, 'success');
+    toast(`Normalized ${data.changes} SPEC_NUM(s) to UPPERCASE`, 'success');
   }
   document.getElementById('casing-banner').style.display = 'none';
   loadStats();
@@ -1306,7 +1306,7 @@ async function bulkFix(op) {
   });
   if (data.error) return toast(data.error, 'error');
 
-  toast(`✓ ${data.description}: ${data.changes} rows updated`, 'success');
+  toast(`${data.description}: ${data.changes} rows updated`, 'success');
 
   const histEl = document.getElementById('fix-history');
   const item = document.createElement('div');
@@ -1718,7 +1718,7 @@ function copyAmrTableTsv() {
   const tsv = allRows.map(r => r.join('\t')).join('\n');
 
   navigator.clipboard.writeText(tsv).then(() => {
-    toast('✓ Copied all monthly AMR data to clipboard (ready for Excel / Sheets)', 'success');
+    toast('Copied all monthly AMR data to clipboard (ready for Excel / Sheets)', 'success');
   }).catch(() => {
     prompt('Copy this TSV table:', tsv);
   });
@@ -1740,7 +1740,7 @@ function exportAmrCsv() {
   a.download = `Monthly_AMR_Surveillance_Report_${state.currentDb || 'WHONET'}.csv`;
   a.click();
   URL.revokeObjectURL(url);
-  toast('✓ Exported all months AMR CSV', 'success');
+  toast('Exported all months AMR CSV', 'success');
 }
 
 // ── Launch Flow: Disclaimer -> Data Source Selection (Path list OR Upload) ──
@@ -1878,7 +1878,7 @@ async function scanWhonetFolder(dirHandle, showToast = true) {
 
   renderLaunchDbSelect();
   renderDbSelector();
-  if (showToast) toast(`✓ Found ${foundFiles.length} WHONET database(s)! Select one to open.`, 'success');
+  if (showToast) toast(`Found ${foundFiles.length} WHONET database(s)! Select one to open.`, 'success');
   return true;
 }
 
@@ -1935,7 +1935,7 @@ async function handleFolderSelected(files) {
   }
   renderLaunchDbSelect();
   renderDbSelector();
-  toast(`✓ Found ${foundFiles.length} WHONET database(s)!`, 'success');
+  toast(`Found ${foundFiles.length} WHONET database(s)!`, 'success');
 }
 
 async function selectFromLaunchList() {
