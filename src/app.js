@@ -64,6 +64,39 @@ function setRuntimeBadge(text, isServer = false) {
 }
 
 // ── Utils ──
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function updateCurrentFileDisplay(filename) {
+  const dbLabel = document.getElementById('db-label');
+  if (dbLabel) {
+    if (filename) {
+      dbLabel.innerHTML = `
+        <div class="current-file-pill" title="Active SQLite Database: ${escapeHtml(filename)}">
+          <span class="current-file-dot"></span>
+          <span class="current-file-icon">🗄️</span>
+          <span class="current-file-name">${escapeHtml(filename)}</span>
+          <span class="current-file-status">Active</span>
+        </div>
+      `;
+    } else {
+      dbLabel.textContent = 'No database loaded';
+    }
+  }
+
+  const dropSub = document.getElementById('dropzone-sub');
+  if (dropSub && filename) {
+    dropSub.innerHTML = `Active dataset: <span class="current-file-chip">🗄️ ${escapeHtml(filename)}</span> • Drop any <code>.sqlite</code> file to replace or switch`;
+  }
+}
+
 function getOrganismName(code) {
   if (!code) return '';
   const key = String(code).trim().toLowerCase();
@@ -707,11 +740,13 @@ function renderDbSelector() {
   const sel = document.getElementById('db-select');
   if (state.isWasmMode && !state.databases.length) {
     sel.innerHTML = '<option value="">(Drop or browse .sqlite file)</option>';
+    updateCurrentFileDisplay('');
     return;
   }
   sel.innerHTML = state.databases.map(db =>
     `<option value="${db}" ${db === state.currentDb ? 'selected' : ''}>${db}</option>`
   ).join('');
+  updateCurrentFileDisplay(state.currentDb);
 }
 
 async function switchDb(filename) {
@@ -912,7 +947,7 @@ function handleFileDrop(e) {
 // ── Stats / Dashboard ──
 async function loadStats() {
   if (!state.currentDb) return;
-  document.getElementById('db-label').textContent = state.currentDb;
+  updateCurrentFileDisplay(state.currentDb);
   const data = await api('/api/stats');
   if (data.error) return toast(data.error, 'error');
   state.stats = data;
@@ -1095,6 +1130,7 @@ async function updateDashboardCharts() {
   const counts = rows.map(r => r.count);
   const bgColors = rows.map((_, i) => PALETTE_COLORS[i % PALETTE_COLORS.length]);
 
+
   // ── Render Bar Chart ──
   const barCanvas = document.getElementById('dashboard-bar-chart');
   if (barCanvas) {
@@ -1164,7 +1200,7 @@ async function updateDashboardCharts() {
     });
   }
 
-  // ── Render Pie / Doughnut Chart ──
+  // ── Render Pie Chart ──
   const pieCanvas = document.getElementById('dashboard-pie-chart');
   if (pieCanvas) {
     const pieCtx = pieCanvas.getContext('2d');
@@ -1187,41 +1223,7 @@ async function updateDashboardCharts() {
         maintainAspectRatio: false,
         animation: { duration: 350 },
         plugins: {
-          legend: {
-            position: 'right',
-            labels: {
-              boxWidth: 12,
-              boxHeight: 12,
-              borderRadius: 4,
-              useBorderRadius: true,
-              padding: 10,
-              font: { family: 'Plus Jakarta Sans', size: 11, weight: '600' },
-              color: textColor,
-              fontColor: textColor,
-              generateLabels: function (chart) {
-                const data = chart.data;
-                if (data.labels.length && data.datasets.length) {
-                  return data.labels.map((lbl, i) => {
-                    const val = data.datasets[0].data[i] || 0;
-                    const pct = totalFiltered > 0 ? ((val / totalFiltered) * 100).toFixed(1) : 0;
-                    const shortLbl = lbl.length > 18 ? lbl.substring(0, 16) + '…' : lbl;
-                    const isVisible = chart.getDataVisibility ? chart.getDataVisibility(i) : true;
-                    return {
-                      text: `${shortLbl} (${pct}%)`,
-                      fillStyle: data.datasets[0].backgroundColor[i],
-                      strokeStyle: doughnutBorder,
-                      fontColor: textColor,
-                      color: textColor,
-                      hidden: !isVisible,
-                      lineWidth: 1,
-                      index: i
-                    };
-                  });
-                }
-                return [];
-              }
-            }
-          },
+          legend: { display: false },
           tooltip: {
             backgroundColor: tooltipBg,
             titleFont: { family: 'Plus Jakarta Sans', size: 12, weight: 'bold' },

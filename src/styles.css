@@ -315,7 +315,6 @@ body {
   background: var(--bg2);
   border-color: var(--border2);
   color: var(--accent);
-  transform: translateY(-1px);
 }
 
 /* ==========================================================================
@@ -451,7 +450,6 @@ body {
 .dev-pill:hover {
   background: var(--bg2);
   border-color: var(--accent);
-  transform: translateY(-1px);
   box-shadow: var(--shadow);
   color: var(--accent) !important;
 }
@@ -517,15 +515,12 @@ body {
   pointer-events: none;
 }
 
-.db-dropzone:hover,
 .db-dropzone.dragover {
   border-color: var(--accent);
   background: var(--bg2);
-  transform: translateY(-1px);
   box-shadow: var(--shadow-lg), 0 0 0 3px var(--accent-glow);
 }
 
-.db-dropzone:hover::before,
 .db-dropzone.dragover::before {
   opacity: 1;
 }
@@ -761,6 +756,77 @@ body {
   font-weight: 500;
 }
 
+/* Active Current File Pill (Dashboard Header & Overview) */
+.current-file-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  padding: 0 12px 0 10px;
+  height: 32px;
+  border-radius: 9999px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.current-file-pill:hover {
+  border-color: var(--accent);
+  background: var(--bg2);
+}
+
+.current-file-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  flex-shrink: 0;
+  animation: pulse-dot 2s infinite ease-in-out;
+}
+
+.current-file-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.current-file-name {
+  color: var(--text);
+  letter-spacing: -0.2px;
+}
+
+.current-file-status {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 700;
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid var(--green-border);
+  padding: 1.5px 7px;
+  border-radius: 9999px;
+  margin-left: 2px;
+}
+
+/* In-Dropzone Current File Chip */
+.current-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--accent-light);
+  border: 1px solid var(--accent-glow);
+  color: var(--accent);
+  padding: 1px 8px;
+  border-radius: 9999px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
 /* ==========================================================================
    Dynamic Surveillance Analytics (Chart Hub)
    ========================================================================== */
@@ -907,7 +973,7 @@ body {
 
 .charts-view-grid {
   display: grid;
-  grid-template-columns: 1.25fr 1fr;
+  grid-template-columns: 2fr 1fr;
   gap: 24px;
   padding: 24px;
 }
@@ -997,7 +1063,6 @@ body {
 
 .btn-primary:hover {
   box-shadow: 0 4px 16px var(--accent-glow);
-  transform: translateY(-1px);
 }
 
 .btn-ghost {
@@ -1011,7 +1076,6 @@ body {
   border-color: var(--border2);
   color: var(--accent);
   background: var(--bg3);
-  transform: translateY(-1px);
 }
 
 .btn-success {
@@ -1022,7 +1086,6 @@ body {
 
 .btn-success:hover {
   background: #059669;
-  transform: translateY(-1px);
 }
 
 .btn-danger {
@@ -1033,7 +1096,6 @@ body {
 
 .btn-danger:hover {
   background: #e11d48;
-  transform: translateY(-1px);
 }
 
 .btn-sm {
@@ -1049,6 +1111,40 @@ body {
   height: 26px;
 }
 
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-xs);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.btn-icon:hover {
+  background: var(--bg2);
+  border-color: var(--border2);
+  color: var(--accent);
+}
+
+.btn-icon svg {
+  transition: transform 0.25s ease;
+}
+
+.btn-icon:hover svg {
+  transform: rotate(60deg);
+}
+
+.btn-icon:active {
+  transform: scale(0.92);
+}
+
 .db-action-export {
   background: var(--bg3);
   color: var(--text);
@@ -1059,7 +1155,6 @@ body {
   background: var(--bg2);
   border-color: var(--accent);
   color: var(--accent);
-  transform: translateY(-1px);
 }
 
 /* ==========================================================================
