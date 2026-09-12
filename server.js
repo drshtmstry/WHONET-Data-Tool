@@ -48,14 +48,11 @@ if (!process.env.WHONET_NO_WATCH && existsSync(srcDir)) {
   });
 }
 
-// Auto-discover all .sqlite files in the data directory (excluding bundled WHO-TST sample files)
+// Auto-discover all .sqlite files in the data directory
 function getDbFiles() {
   try {
     return readdirSync(WHONET_DIR)
-      .filter((f) => {
-        const lower = f.toLowerCase();
-        return lower.endsWith(".sqlite") && !lower.startsWith("who-tst");
-      })
+      .filter((f) => f.toLowerCase().endsWith(".sqlite"))
       .sort();
   } catch (e) {
     console.error(`Could not read ${WHONET_DIR}:`, e.message);

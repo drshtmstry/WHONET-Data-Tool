@@ -89,15 +89,71 @@ function wasmRun(sql, params = []) {
   return { changes };
 }
 
+// Ensure the loaded WASM DB has a FULL_NAME column.
+// Some WHONET exports (e.g. WHO-TST files) store FIRST_NAME + LAST_NAME separately.
+function normaliseSchema() {
+  if (!state.wasmDb) return;
+  try {
+    const cols = wasmSelect("PRAGMA table_info(Isolates)").map(r => r.name);
+    if (!cols.includes('FULL_NAME') && cols.includes('FIRST_NAME')) {
+      state.wasmDb.run(
+        `ALTER TABLE Isolates ADD COLUMN FULL_NAME TEXT GENERATED ALWAYS AS ` +
+        `(TRIM(COALESCE(FIRST_NAME,'') || ' ' || COALESCE(LAST_NAME,''))) VIRTUAL`
+      );
+    }
+  } catch (e) {
+    console.warn('normaliseSchema:', e.message);
+  }
+}
+
+
+async function autoSaveToHandle() {
+  if (!state.wasmDb || !state.activeFileHandle || typeof state.activeFileHandle.createWritable !== 'function') return;
+  try {
+    // Only auto-save if permission is already granted (no prompt)
+    const perm = await state.activeFileHandle.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') return;
+    const binaryArray = state.wasmDb.export();
+    const writable = await state.activeFileHandle.createWritable();
+    await writable.write(binaryArray);
+    await writable.close();
+    state.isModified = false;
+    // Brief visual feedback on the badge
+    const badge = document.getElementById('runtime-badge');
+    if (badge) {
+      const prev = badge.textContent;
+      badge.textContent = '✅ Auto-saved';
+      setTimeout(() => { badge.textContent = prev; }, 1500);
+    }
+  } catch (err) {
+    console.warn('Auto-save failed, falling back to manual save:', err.message);
+  }
+}
+
 function markModified() {
   state.isModified = true;
   const saveBtn = document.getElementById('btn-save-file');
   if (saveBtn) {
     if (state.activeFileHandle && typeof state.activeFileHandle.createWritable === 'function') {
-      saveBtn.style.display = 'inline-flex';
-      saveBtn.classList.remove('btn-outline');
-      saveBtn.classList.add('btn-success');
-      saveBtn.innerHTML = '💾 Save to File';
+      // Check if we already have readwrite — if so, auto-save silently
+      state.activeFileHandle.queryPermission({ mode: 'readwrite' }).then(perm => {
+        if (perm === 'granted') {
+          saveBtn.style.display = 'none'; // auto-save handles it
+          autoSaveToHandle();
+        } else {
+          saveBtn.style.display = 'inline-flex';
+          saveBtn.classList.remove('btn-outline');
+          saveBtn.classList.add('btn-success');
+          saveBtn.innerHTML = '💾 Save to File';
+        }
+      }).catch(() => {
+        saveBtn.style.display = 'inline-flex';
+        saveBtn.classList.remove('btn-outline');
+        saveBtn.classList.add('btn-success');
+        saveBtn.innerHTML = '💾 Save to File';
+      });
+    } else {
+      saveBtn.style.display = 'none';
     }
   }
   const dlBtn = document.getElementById('btn-download-db');
@@ -550,6 +606,19 @@ function fmtDate(d) {
 }
 
 // ── Navigation ──
+function isSampleDb(name) {
+  return (name || state.currentDb || '').toLowerCase().startsWith('who-tst');
+}
+
+function setDuplicatesTabVisible(visible) {
+  const nav = document.getElementById('nav-duplicates');
+  if (nav) nav.style.display = visible ? '' : 'none';
+  // If currently on duplicates tab and it's being hidden, redirect to dashboard
+  if (!visible && document.getElementById('page-duplicates')?.classList.contains('active')) {
+    showPage('dashboard');
+  }
+}
+
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -606,7 +675,7 @@ function renderDbSelector() {
     return;
   }
   sel.innerHTML = state.databases.map(db =>
-    `<option value="${db}" ${db === state.currentDb ? 'selected' : ''}>${db.replace('.sqlite', '')}</option>`
+    `<option value="${db}" ${db === state.currentDb ? 'selected' : ''}>${db}</option>`
   ).join('');
 }
 
@@ -624,8 +693,31 @@ async function switchDb(filename) {
       }
       return;
     }
-    // If not found in fileHandles, warn user
-    return toast(`Cannot switch to ${filename} directly without file access.`, 'info');
+    // No file handle — try falling back to the local server (exits WASM mode)
+    const data = await api('/api/open-database', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename })
+    });
+    if (data.error) return toast(`Cannot switch: ${data.error}`, 'error');
+    // Successfully opened on server — leave WASM mode
+    state.isWasmMode = false;
+    state.wasmDb = null;
+    state.activeFileHandle = null;
+    state.isModified = false;
+    state.currentDb = filename;
+    const badge = document.getElementById('runtime-badge');
+    if (badge) {
+      badge.textContent = '⚡ Local Server Connected';
+      badge.style.background = 'rgba(74, 222, 128, 0.15)';
+      badge.style.color = 'var(--green)';
+    }
+    const saveBtn = document.getElementById('btn-save-file');
+    if (saveBtn) saveBtn.style.display = 'none';
+    renderDbSelector();
+    toast(`Switched to ${filename} (${data.count.toLocaleString()} records)`, 'success');
+    loadStats();
+    return;
   }
 
   const data = await api('/api/open-database', {
@@ -697,6 +789,7 @@ async function loadSampleDatabase(sampleFilename) {
     const dlBtn = document.getElementById('btn-download-db');
     if (dlBtn) dlBtn.style.display = 'inline-flex';
 
+    normaliseSchema();
     renderDbSelector();
     const count = wasmSelect('SELECT COUNT(*) as c FROM Isolates')[0]?.c || 0;
     toast(`Loaded sample ${sampleFilename} (${count.toLocaleString()} records)`, 'success');
@@ -774,6 +867,7 @@ async function handleFileUpload(file, fileHandle = null) {
     const dlBtn = document.getElementById('btn-download-db');
     if (dlBtn) dlBtn.style.display = 'inline-flex';
 
+    normaliseSchema();
     renderDbSelector();
     const count = wasmSelect('SELECT COUNT(*) as c FROM Isolates')[0]?.c || 0;
     toast(`Successfully loaded ${file.name} into browser (${count.toLocaleString()} records)`, 'success');
@@ -1888,8 +1982,15 @@ async function restoreWhonetFolder() {
   if (!dirHandle) return;
 
   try {
-    const permission = await dirHandle.queryPermission({ mode: 'read' });
-    if (permission === 'granted') await scanWhonetFolder(dirHandle, false);
+    // Request readwrite so auto-save works without prompting after mutations
+    const permission = await dirHandle.queryPermission({ mode: 'readwrite' });
+    if (permission === 'granted') {
+      await scanWhonetFolder(dirHandle, false);
+    } else {
+      // Fall back to read-only scan so folder listing still works
+      const readPerm = await dirHandle.queryPermission({ mode: 'read' });
+      if (readPerm === 'granted') await scanWhonetFolder(dirHandle, false);
+    }
   } catch (err) {
     console.info('Saved folder is no longer available:', err.message);
   }
@@ -2031,6 +2132,14 @@ window.addEventListener('drop', e => {
   const files = e.dataTransfer?.files;
   if (files && files.length > 0 && files[0].name.toLowerCase().endsWith('.sqlite')) {
     handleFileDrop(e);
+  }
+});
+
+window.addEventListener('beforeunload', e => {
+  if (state.isModified && state.isWasmMode) {
+    e.preventDefault();
+    // Modern browsers show their own generic message; this string is legacy-compat
+    e.returnValue = 'You have unsaved changes. Leave anyway?';
   }
 });
 
