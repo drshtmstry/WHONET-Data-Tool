@@ -20,6 +20,49 @@ let state = {
   isModified: false
 };
 
+// ── Theme Management & Runtime Indicators ──
+function initTheme() {
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+  updateThemeToggleBtn(currentTheme);
+  if (typeof Chart !== 'undefined') {
+    Chart.defaults.color = currentTheme === 'dark' ? '#e2e8f0' : '#334155';
+  }
+}
+
+function toggleTheme() {
+  const currentTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  try {
+    localStorage.setItem('whonet-theme', newTheme);
+  } catch (e) { }
+  updateThemeToggleBtn(newTheme);
+  if (typeof Chart !== 'undefined') {
+    Chart.defaults.color = newTheme === 'dark' ? '#e2e8f0' : '#334155';
+  }
+  if (typeof updateDashboardCharts === 'function' && state.currentDb) {
+    updateDashboardCharts();
+  }
+}
+
+function updateThemeToggleBtn(theme) {
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) {
+    btn.innerHTML = theme === 'dark' ? '☀️' : '🌙';
+    btn.title = theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+  }
+}
+
+function setRuntimeBadge(text, isServer = false) {
+  const badge = document.getElementById('runtime-badge');
+  if (!badge) return;
+  const dotClass = isServer ? 'connection-dot' : 'connection-dot wasm';
+  badge.innerHTML = `<span class="${dotClass}"></span> <span>${text}</span>`;
+  badge.style.background = isServer ? 'var(--green-bg)' : 'var(--accent-light)';
+  badge.style.color = isServer ? 'var(--green)' : 'var(--accent)';
+  badge.style.borderColor = isServer ? 'var(--green-border)' : 'var(--accent-glow)';
+}
+
 // ── Utils ──
 function getOrganismName(code) {
   if (!code) return '';
@@ -633,18 +676,14 @@ function showPage(name) {
 
 // ── Init ──
 async function init() {
-  const badge = document.getElementById('runtime-badge');
+  initTheme();
   try {
     const data = await fetch(API + '/api/databases').then(r => r.json());
     if (data && Array.isArray(data.databases)) {
       state.isWasmMode = false;
       state.databases = data.databases;
       state.currentDb = data.current;
-      if (badge) {
-        badge.textContent = '⚡ Local Server Connected';
-        badge.style.background = 'rgba(74, 222, 128, 0.15)';
-        badge.style.color = 'var(--green)';
-      }
+      setRuntimeBadge('Local Server Connected', true);
       renderDbSelector();
       if (state.currentDb) {
         await loadStats();
@@ -657,11 +696,7 @@ async function init() {
 
   // If local server is not accessible (e.g. running on Vercel / GitHub Pages / static)
   state.isWasmMode = true;
-  if (badge) {
-    badge.textContent = '🌐 In-Browser Client Mode (WASM)';
-    badge.style.background = 'rgba(96, 165, 250, 0.15)';
-    badge.style.color = 'var(--accent)';
-  }
+  setRuntimeBadge('In-Browser Client Mode (WASM)', false);
   const btnOpenPath = document.getElementById('btn-open-path');
   if (btnOpenPath) btnOpenPath.style.display = 'none';
   renderDbSelector();
@@ -706,12 +741,7 @@ async function switchDb(filename) {
     state.activeFileHandle = null;
     state.isModified = false;
     state.currentDb = filename;
-    const badge = document.getElementById('runtime-badge');
-    if (badge) {
-      badge.textContent = '⚡ Local Server Connected';
-      badge.style.background = 'rgba(74, 222, 128, 0.15)';
-      badge.style.color = 'var(--green)';
-    }
+    setRuntimeBadge('Local Server Connected', true);
     const saveBtn = document.getElementById('btn-save-file');
     if (saveBtn) saveBtn.style.display = 'none';
     renderDbSelector();
@@ -779,12 +809,7 @@ async function loadSampleDatabase(sampleFilename) {
       state.databases.push(sampleFilename);
     }
 
-    const badge = document.getElementById('runtime-badge');
-    if (badge) {
-      badge.textContent = '🌐 In-Browser WASM Mode';
-      badge.style.background = 'rgba(96, 165, 250, 0.15)';
-      badge.style.color = 'var(--accent)';
-    }
+    setRuntimeBadge('In-Browser WASM Mode', false);
 
     const dlBtn = document.getElementById('btn-download-db');
     if (dlBtn) dlBtn.style.display = 'inline-flex';
@@ -847,12 +872,7 @@ async function handleFileUpload(file, fileHandle = null) {
       state.databases.push(file.name);
     }
 
-    const badge = document.getElementById('runtime-badge');
-    if (badge) {
-      badge.textContent = '🌐 In-Browser WASM Mode';
-      badge.style.background = 'rgba(96, 165, 250, 0.15)';
-      badge.style.color = 'var(--accent)';
-    }
+    setRuntimeBadge('In-Browser WASM Mode', false);
 
     const saveBtn = document.getElementById('btn-save-file');
     if (saveBtn) {
@@ -899,7 +919,26 @@ async function loadStats() {
 
   // Update badge
   const activeDupCount = state.dupMode === 'patient' ? (data.dupPtRows || 0) : (data.dupRows || 0);
+  const activeDupGroups = state.dupMode === 'patient' ? (data.dupPtGroups || 0) : (data.dupGroups || 0);
   document.getElementById('dup-badge').textContent = activeDupCount;
+
+  // Populate Executive KPI Stat Cards
+  const statTotal = document.getElementById('stat-total-isolates');
+  if (statTotal) statTotal.textContent = (data.total || 0).toLocaleString();
+
+  const statDupRows = document.getElementById('stat-dup-rows');
+  if (statDupRows) statDupRows.textContent = (activeDupCount || 0).toLocaleString();
+
+  const statDupGroups = document.getElementById('stat-dup-groups-text');
+  if (statDupGroups) {
+    statDupGroups.textContent = `In ${(activeDupGroups || 0).toLocaleString()} clusters (${state.dupMode === 'patient' ? 'Patient ID' : 'Specimen ID'})`;
+  }
+
+  const statOrgs = document.getElementById('stat-organisms-count');
+  if (statOrgs) statOrgs.textContent = (data.organisms ? data.organisms.length : 0).toLocaleString();
+
+  const statWards = document.getElementById('stat-wards-count');
+  if (statWards) statWards.textContent = (data.wards ? data.wards.length : 0).toLocaleString();
 
   // Populate filters
   const orgFilter = document.getElementById('isolates-org-filter');
@@ -971,9 +1010,9 @@ function resetChartZoom(chartType) {
 }
 
 const PALETTE_COLORS = [
-  '#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed',
-  '#0891b2', '#db2777', '#4f46e5', '#ca8a04', '#16a34a',
-  '#ea580c', '#9333ea', '#0284c7', '#65a30d', '#64748b'
+  '#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#f43f5e',
+  '#8b5cf6', '#3b82f6', '#14b8a6', '#ec4899', '#6366f1',
+  '#84cc16', '#a855f7', '#0ea5e9', '#f97316', '#64748b'
 ];
 
 async function updateDashboardCharts() {
@@ -1003,6 +1042,18 @@ async function updateDashboardCharts() {
 
   const rows = res.rows || [];
   const totalFiltered = res.totalFiltered || 0;
+
+  // Detect dark mode for adaptive styling
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const textColor = isDark ? '#e2e8f0' : '#334155';
+  const mutedColor = isDark ? '#94a3b8' : '#64748b';
+  const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(226, 232, 240, 0.8)';
+  const doughnutBorder = isDark ? '#121826' : '#ffffff';
+  const tooltipBg = isDark ? 'rgba(18, 24, 38, 0.96)' : 'rgba(15, 23, 42, 0.95)';
+
+  if (typeof Chart !== 'undefined') {
+    Chart.defaults.color = textColor;
+  }
 
   // Update subtitle info
   const sub = document.getElementById('chart-filtered-sub');
@@ -1060,21 +1111,22 @@ async function updateDashboardCharts() {
           backgroundColor: bgColors.map(c => c + 'cc'),
           borderColor: bgColors,
           borderWidth: 1.5,
-          borderRadius: 5,
-          maxBarThickness: 38
+          borderRadius: 6,
+          maxBarThickness: 40
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: { duration: 400 },
+        animation: { duration: 350 },
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-            titleFont: { family: 'Inter', size: 12, weight: 'bold' },
-            bodyFont: { family: 'Inter', size: 12 },
-            padding: 10,
+            backgroundColor: tooltipBg,
+            titleFont: { family: 'Plus Jakarta Sans', size: 12, weight: 'bold' },
+            bodyFont: { family: 'Plus Jakarta Sans', size: 12 },
+            padding: 12,
+            cornerRadius: 8,
             callbacks: {
               label: ctx => {
                 const cnt = ctx.parsed.y || 0;
@@ -1088,8 +1140,8 @@ async function updateDashboardCharts() {
           x: {
             grid: { display: false },
             ticks: {
-              font: { family: 'Inter', size: 11 },
-              color: '#475569',
+              font: { family: 'Plus Jakarta Sans', size: 11, weight: '600' },
+              color: mutedColor,
               maxRotation: 40,
               minRotation: 0,
               callback: function (val, index) {
@@ -1100,10 +1152,10 @@ async function updateDashboardCharts() {
           },
           y: {
             beginAtZero: true,
-            grid: { color: 'rgba(226, 232, 240, 0.8)' },
+            grid: { color: gridColor },
             ticks: {
-              font: { family: 'JetBrains Mono', size: 11 },
-              color: '#64748b',
+              font: { family: 'JetBrains Mono', size: 11, weight: '500' },
+              color: mutedColor,
               precision: 0
             }
           }
@@ -1125,35 +1177,42 @@ async function updateDashboardCharts() {
         datasets: [{
           data: counts,
           backgroundColor: bgColors,
-          borderColor: '#ffffff',
-          borderWidth: 2,
-          hoverOffset: 6
+          borderColor: doughnutBorder,
+          borderWidth: 2.5,
+          hoverOffset: 8
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: { duration: 400 },
+        animation: { duration: 350 },
         plugins: {
           legend: {
             position: 'right',
             labels: {
               boxWidth: 12,
               boxHeight: 12,
-              padding: 8,
-              font: { family: 'Inter', size: 11 },
-              color: '#334155',
+              borderRadius: 4,
+              useBorderRadius: true,
+              padding: 10,
+              font: { family: 'Plus Jakarta Sans', size: 11, weight: '600' },
+              color: textColor,
+              fontColor: textColor,
               generateLabels: function (chart) {
                 const data = chart.data;
                 if (data.labels.length && data.datasets.length) {
                   return data.labels.map((lbl, i) => {
                     const val = data.datasets[0].data[i] || 0;
                     const pct = totalFiltered > 0 ? ((val / totalFiltered) * 100).toFixed(1) : 0;
-                    const shortLbl = lbl.length > 16 ? lbl.substring(0, 14) + '…' : lbl;
+                    const shortLbl = lbl.length > 18 ? lbl.substring(0, 16) + '…' : lbl;
+                    const isVisible = chart.getDataVisibility ? chart.getDataVisibility(i) : true;
                     return {
                       text: `${shortLbl} (${pct}%)`,
                       fillStyle: data.datasets[0].backgroundColor[i],
-                      strokeStyle: '#fff',
+                      strokeStyle: doughnutBorder,
+                      fontColor: textColor,
+                      color: textColor,
+                      hidden: !isVisible,
                       lineWidth: 1,
                       index: i
                     };
@@ -1164,10 +1223,11 @@ async function updateDashboardCharts() {
             }
           },
           tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-            titleFont: { family: 'Inter', size: 12, weight: 'bold' },
-            bodyFont: { family: 'Inter', size: 12 },
-            padding: 10,
+            backgroundColor: tooltipBg,
+            titleFont: { family: 'Plus Jakarta Sans', size: 12, weight: 'bold' },
+            bodyFont: { family: 'Plus Jakarta Sans', size: 12 },
+            padding: 12,
+            cornerRadius: 8,
             callbacks: {
               label: ctx => {
                 const cnt = ctx.parsed || 0;
@@ -1177,7 +1237,7 @@ async function updateDashboardCharts() {
             }
           }
         },
-        cutout: '58%'
+        cutout: '62%'
       }
     });
   }
