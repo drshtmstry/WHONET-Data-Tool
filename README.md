@@ -1,10 +1,7 @@
 # WHONET Data Tool
 
-<div align="center">
-  <img src="https://whonet.org/img/WHONET_Logo_transparentbg.png" alt="WHONET Logo" width="90" />
-  <p>Open-source utility for inspecting, deduplicating, and analyzing WHONET SQLite databases.</p>
-  <p>🌐 <strong><a href="https://whonet-tool.vercel.app/">whonet-tool.vercel.app</a></strong></p>
-</div>
+<p>Open-source utility for inspecting, deduplicating, and analyzing WHONET SQLite databases.</p>
+<p>🌐 <strong><a href="https://whonet-tool.vercel.app/">whonet-tool.vercel.app</a></strong></p>
 
 ---
 
