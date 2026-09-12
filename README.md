@@ -25,7 +25,6 @@ Reads `.sqlite` files directly from `C:\WHONET\Data`. Writes go straight to disk
 ```bash
 npm start       # start server
 npm run dev     # start with auto-restart on file changes
-npm run check   # validate JS syntax
 ```
 
 ## Features

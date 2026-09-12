@@ -992,6 +992,33 @@ function handleRequest(req, res) {
     return;
   }
 
+  // API: delete multiple rows (batch)
+  if (path === "/api/delete-rows" && req.method === "POST") {
+    if (!currentDbFullPath)
+      return sendJson(res, { error: "No database open" }, 400);
+    let body = "";
+    req.on("data", (d) => (body += d));
+    req.on("end", () => {
+      try {
+        const { row_indices } = JSON.parse(body);
+        if (!Array.isArray(row_indices) || !row_indices.length) {
+          return sendJson(res, { ok: true, changes: 0 });
+        }
+        withDb((db) => {
+          const placeholders = row_indices.map(() => "?").join(",");
+          const stmt = db.prepare(
+            `DELETE FROM Isolates WHERE ROW_IDX IN (${placeholders})`
+          );
+          const result = stmt.run(...row_indices);
+          sendJson(res, { ok: true, changes: result.changes });
+        });
+      } catch (e) {
+        sendJson(res, { error: e.message }, 500);
+      }
+    });
+    return;
+  }
+
   if (path === "/api/update-field" && req.method === "POST") {
     if (!currentDbFullPath)
       return sendJson(res, { error: "No database open" }, 400);
@@ -1003,6 +1030,7 @@ function handleRequest(req, res) {
         const EDITABLE_FIELDS = [
           "SPEC_NUM",
           "PATIENT_ID",
+          "SPEC_DATE",
           "SPEC_TYPE",
           "ORGANISM",
           "FULL_NAME",
@@ -1010,6 +1038,9 @@ function handleRequest(req, res) {
           "AGE",
           "WARD",
           "DEPARTMENT",
+          "INSTITUT",
+          "DATE_ADMIS",
+          "DATE_DATA",
           "COMMENT",
           "ESBL",
           "CARBAPENEM",
@@ -1025,6 +1056,66 @@ function handleRequest(req, res) {
           const result = db
             .prepare(`UPDATE Isolates SET ${field} = ? WHERE ROW_IDX = ?`)
             .run(value, row_idx);
+          sendJson(res, { ok: true, changes: result.changes });
+        });
+      } catch (e) {
+        sendJson(res, { error: e.message }, 500);
+      }
+    });
+    return;
+  }
+
+  // API: batch update multiple fields for an isolate row
+  if (path === "/api/update-row" && req.method === "POST") {
+    if (!currentDbFullPath)
+      return sendJson(res, { error: "No database open" }, 400);
+    let body = "";
+    req.on("data", (d) => (body += d));
+    req.on("end", () => {
+      try {
+        const { row_idx, fields } = JSON.parse(body);
+        if (!row_idx || !fields)
+          return sendJson(res, { error: "Missing row_idx or fields" }, 400);
+        const EDITABLE_FIELDS = [
+          "SPEC_NUM",
+          "PATIENT_ID",
+          "SPEC_DATE",
+          "SPEC_TYPE",
+          "ORGANISM",
+          "FULL_NAME",
+          "SEX",
+          "AGE",
+          "WARD",
+          "DEPARTMENT",
+          "INSTITUT",
+          "DATE_ADMIS",
+          "DATE_DATA",
+          "COMMENT",
+          "ESBL",
+          "CARBAPENEM",
+          "MRSA",
+          "URINECOUNT",
+          "SEROTYPE",
+          "BETA_LACT",
+          "INDUC_CLI",
+        ];
+        const updates = [];
+        const params = [];
+        for (const [key, val] of Object.entries(fields)) {
+          if (EDITABLE_FIELDS.includes(key)) {
+            updates.push(`${key} = ?`);
+            params.push(val);
+          }
+        }
+        if (!updates.length) {
+          return sendJson(res, { ok: true, changes: 0 });
+        }
+        params.push(row_idx);
+        withDb((db) => {
+          const stmt = db.prepare(
+            `UPDATE Isolates SET ${updates.join(", ")} WHERE ROW_IDX = ?`
+          );
+          const result = stmt.run(...params);
           sendJson(res, { ok: true, changes: result.changes });
         });
       } catch (e) {

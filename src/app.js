@@ -93,7 +93,7 @@ function updateCurrentFileDisplay(filename) {
 
   const dropSub = document.getElementById('dropzone-sub');
   if (dropSub && filename) {
-    dropSub.innerHTML = `Active dataset: <span class="current-file-chip">🗄️ ${escapeHtml(filename)}</span> • Drop any <code>.sqlite</code> file to replace or switch`;
+    dropSub.innerHTML = `Active dataset: <span class="current-file-chip">🗄️ ${escapeHtml(filename)}</span><br>• Drop any <code>.sqlite</code> file to replace or switch`;
   }
 }
 
@@ -443,6 +443,16 @@ function handleWasmApi(path, options = {}) {
       return { ok: true, changes: res.changes };
     }
 
+    if (pathname === '/api/delete-rows') {
+      const { row_indices } = body;
+      if (!Array.isArray(row_indices) || !row_indices.length) {
+        return { ok: true, changes: 0 };
+      }
+      const placeholders = row_indices.map(() => '?').join(',');
+      const res = wasmRun(`DELETE FROM Isolates WHERE ROW_IDX IN (${placeholders})`, row_indices);
+      return { ok: true, changes: res.changes };
+    }
+
     if (pathname === '/api/delete-duplicates') {
       const { spec_num, patient_id, mode } = body;
       let sql = '';
@@ -494,9 +504,37 @@ function handleWasmApi(path, options = {}) {
 
     if (pathname === '/api/update-field') {
       const { row_idx, field, value } = body;
-      const EDITABLE_FIELDS = ['SPEC_NUM', 'PATIENT_ID', 'SPEC_TYPE', 'ORGANISM', 'FULL_NAME', 'SEX', 'AGE', 'WARD', 'DEPARTMENT', 'COMMENT', 'ESBL', 'CARBAPENEM', 'MRSA', 'URINECOUNT', 'SEROTYPE', 'BETA_LACT', 'INDUC_CLI'];
+      const EDITABLE_FIELDS = [
+        'SPEC_NUM', 'PATIENT_ID', 'SPEC_DATE', 'SPEC_TYPE', 'ORGANISM',
+        'FULL_NAME', 'SEX', 'AGE', 'WARD', 'DEPARTMENT', 'INSTITUT',
+        'DATE_ADMIS', 'DATE_DATA', 'COMMENT', 'ESBL', 'CARBAPENEM',
+        'MRSA', 'URINECOUNT', 'SEROTYPE', 'BETA_LACT', 'INDUC_CLI'
+      ];
       if (!EDITABLE_FIELDS.includes(field)) return { error: 'Field not editable' };
       const res = wasmRun(`UPDATE Isolates SET ${field} = ? WHERE ROW_IDX = ?`, [value, row_idx]);
+      return { ok: true, changes: res.changes };
+    }
+
+    if (pathname === '/api/update-row') {
+      const { row_idx, fields } = body;
+      if (!row_idx || !fields) return { error: 'Missing row_idx or fields' };
+      const EDITABLE_FIELDS = [
+        'SPEC_NUM', 'PATIENT_ID', 'SPEC_DATE', 'SPEC_TYPE', 'ORGANISM',
+        'FULL_NAME', 'SEX', 'AGE', 'WARD', 'DEPARTMENT', 'INSTITUT',
+        'DATE_ADMIS', 'DATE_DATA', 'COMMENT', 'ESBL', 'CARBAPENEM',
+        'MRSA', 'URINECOUNT', 'SEROTYPE', 'BETA_LACT', 'INDUC_CLI'
+      ];
+      const updates = [];
+      const params = [];
+      for (const [key, val] of Object.entries(fields)) {
+        if (EDITABLE_FIELDS.includes(key)) {
+          updates.push(`${key} = ?`);
+          params.push(val);
+        }
+      }
+      if (!updates.length) return { ok: true, changes: 0 };
+      params.push(row_idx);
+      const res = wasmRun(`UPDATE Isolates SET ${updates.join(', ')} WHERE ROW_IDX = ?`, params);
       return { ok: true, changes: res.changes };
     }
 
@@ -1280,8 +1318,9 @@ function renderIsolatesTable(rows) {
       <td>${r.CARBAPENEM ? `<span class="badge badge-${r.CARBAPENEM === '+' ? 'r' : 's'}">${r.CARBAPENEM}</span>` : '—'}</td>
       <td>${r.MRSA ? `<span class="badge badge-${r.MRSA === '+' ? 'r' : 's'}">${r.MRSA}</span>` : '—'}</td>
       <td>
+        <button class="btn btn-ghost btn-sm" onclick="openEditModal(${r.ROW_IDX})" title="Edit / correct this isolate">Edit</button>
         <button class="btn btn-ghost btn-sm" onclick="viewDetail(${r.ROW_IDX})">View</button>
-        <button class="btn btn-danger btn-sm" onclick="confirmDeleteRow(${r.ROW_IDX}, '${r.SPEC_NUM}')">Del</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDeleteRow(${r.ROW_IDX}, '${(r.SPEC_NUM || '').replace(/'/g, "\\'")}')">Del</button>
       </td>
     </tr>`).join('')}
     </tbody>
@@ -1345,67 +1384,120 @@ async function loadDuplicates(page = 1) {
   if (data.error) return toast(data.error, 'error');
 
   const modeLabel = mode === 'patient' ? 'Patient ID' : 'Specimen ID';
-  const groups = groupRows(data.rows, mode);
-  const groupCount = Object.keys(groups).length;
+  const groupCount = Object.keys(groupRows(data.rows, mode)).length;
+  const totalGroups = mode === 'patient'
+    ? (state.stats?.dupPtGroups || groupCount)
+    : (state.stats?.dupGroups || groupCount);
 
   document.getElementById('dup-count').textContent =
-    `${data.totalCount.toLocaleString()} duplicate rows in ${groupCount.toLocaleString()} groups (grouped by ${modeLabel})`;
+    `${data.totalCount.toLocaleString()} duplicate records across ${totalGroups.toLocaleString()} groups (ordered by ${modeLabel})`;
 
-  if (!data.rows.length) {
-    document.getElementById('dup-table-body').innerHTML =
-      `<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No duplicates found by ${modeLabel}!</div></div>`;
-    document.getElementById('dup-pagination').innerHTML = '';
-    return;
-  }
-
-  let html = '<div class="dup-groups">';
-
-  for (const [groupKey, rows] of Object.entries(groups)) {
-    const safeGroupKey = groupKey.replace(/'/g, "\\'");
-    const firstRow = rows[0];
-    const groupSubText = mode === 'patient'
-      ? (firstRow.FULL_NAME ? `Patient: ${firstRow.FULL_NAME}` : '')
-      : (firstRow.PATIENT_ID ? `Patient ID: ${firstRow.PATIENT_ID}` : '');
-
-    html += `
-      <div class="dup-group-header">
-        <span style="font-size:11px;color:var(--text3);text-transform:uppercase;font-weight:700;">${modeLabel}:</span>
-        <span class="dup-group-spec">${groupKey}</span>
-        ${groupSubText ? `<span style="font-size:12px;color:var(--text2);font-weight:500;">(${groupSubText})</span>` : ''}
-        <span class="badge badge-dup" style="margin-left:auto;">${rows.length} records</span>
-      </div>
-      <table style="width:100%;border-collapse:collapse">
-        <thead><tr>
-          <th>Patient Name</th><th>Patient ID</th><th>Specimen #</th><th>Date</th>
-          <th>Type</th><th>Organism</th><th>Sex</th><th>Age</th><th>Ward</th><th>Row #</th><th></th>
-        </tr></thead>
-        <tbody>`;
-
-    rows.forEach(r => {
-      html += `
-        <tr class="dup-row">
-          <td class="pt-name">${r.FULL_NAME || '—'}</td>
-          <td class="mono" style="font-size:11px;font-weight:${mode === 'patient' ? '600' : 'normal'};color:${mode === 'patient' ? 'var(--accent)' : 'inherit'}">${r.PATIENT_ID || '—'}</td>
-          <td class="mono" style="font-size:11px;font-weight:${mode === 'spec' ? '600' : 'normal'};color:${mode === 'spec' ? 'var(--accent)' : 'inherit'}">${r.SPEC_NUM || '—'}</td>
-          <td>${fmtDate(r.SPEC_DATE)}</td>
-          <td>${r.SPEC_TYPE || '—'}</td>
-          <td>${renderOrgBadge(r.ORGANISM)}</td>
-          <td>${r.SEX || '—'}</td>
-          <td>${r.AGE || '—'}</td>
-          <td>${r.WARD || '—'}</td>
-          <td class="mono" style="color:var(--text3);font-size:11px">#${r.ROW_IDX}</td>
-          <td>
-            <button class="btn btn-danger btn-sm" onclick="deleteRowAndRefresh(${r.ROW_IDX})">✕ Delete</button>
-          </td>
-        </tr>`;
-    });
-
-    html += '</tbody></table>';
-  }
-  html += '</div>';
-
-  document.getElementById('dup-table-body').innerHTML = html;
+  document.getElementById('dup-table-body').innerHTML = renderDuplicatesTable(data.rows, mode);
+  updateDupSelectedState();
   renderPagination('dup-pagination', page, data.totalCount, 200, loadDuplicates);
+}
+
+function renderDuplicatesTable(rows, mode = state.dupMode) {
+  const modeLabel = mode === 'patient' ? 'Patient ID' : 'Specimen ID';
+  if (!rows || !rows.length) {
+    return `<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No duplicates found by ${modeLabel}!</div></div>`;
+  }
+
+  let lastGroupKey = null;
+  let clusterIdx = 0;
+
+  return `
+    <table class="dup-table">
+      <thead>
+        <tr>
+          <th class="col-check" style="width: 44px; text-align: center;">
+            <input type="checkbox" id="dup-select-all" onchange="toggleSelectAllDups(this.checked)" title="Select all on this page" />
+          </th>
+          <th style="width: 70px;">Row</th>
+          <th>${mode === 'patient' ? 'Patient ID (Matched)' : 'Specimen # (Matched)'}</th>
+          <th>${mode === 'patient' ? 'Specimen #' : 'Patient ID'}</th>
+          <th>Patient Name</th>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Organism</th>
+          <th>Sex</th>
+          <th>Age</th>
+          <th>Ward</th>
+          <th style="text-align: right; width: 180px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((r, idx) => {
+    const keyVal = mode === 'patient' ? (r.PATIENT_ID || '') : (r.SPEC_NUM || '');
+    const groupKey = keyVal.trim().toUpperCase() || '(BLANK)';
+    const isNewGroup = idx > 0 && groupKey !== lastGroupKey;
+    if (idx === 0 || groupKey !== lastGroupKey) {
+      clusterIdx++;
+      lastGroupKey = groupKey;
+    }
+
+    const clusterClass = `dup-cluster-${clusterIdx % 2}`;
+    const startClass = isNewGroup ? 'dup-group-start' : '';
+
+    const matchedVal = mode === 'patient' ? (r.PATIENT_ID || '—') : (r.SPEC_NUM || '—');
+    const otherVal = mode === 'patient' ? (r.SPEC_NUM || '—') : (r.PATIENT_ID || '—');
+    const safeSpecNum = (r.SPEC_NUM || '').replace(/'/g, "\\'");
+
+    return `
+            <tr class="dup-row ${clusterClass} ${startClass}">
+              <td class="col-check" style="text-align: center;">
+                <input type="checkbox" class="dup-row-check" value="${r.ROW_IDX}" onchange="updateDupSelectedState()" />
+              </td>
+              <td class="mono" style="color:var(--text3);font-size:11.5px">#${r.ROW_IDX}</td>
+              <td class="mono" style="font-size:12px;font-weight:700;color:var(--accent)">${matchedVal}</td>
+              <td class="mono" style="font-size:12px;color:var(--text2)">${otherVal}</td>
+              <td class="pt-name">${r.FULL_NAME || '—'}</td>
+              <td>${fmtDate(r.SPEC_DATE)}</td>
+              <td>${r.SPEC_TYPE || '—'}</td>
+              <td>${renderOrgBadge(r.ORGANISM)}</td>
+              <td>${r.SEX || '—'}</td>
+              <td>${r.AGE || '—'}</td>
+              <td>${r.WARD || '—'}</td>
+              <td style="text-align: right; white-space: nowrap;">
+                <button class="btn btn-ghost btn-sm" onclick="openEditModal(${r.ROW_IDX})" title="Edit / correct this isolate">Edit</button>
+                <button class="btn btn-ghost btn-sm" onclick="viewDetail(${r.ROW_IDX})" title="View isolate details">View</button>
+                <button class="btn btn-danger btn-sm" onclick="confirmDeleteRow(${r.ROW_IDX}, '${safeSpecNum}')" title="Delete this isolate">Del</button>
+              </td>
+            </tr>`;
+  }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function toggleSelectAllDups(checked) {
+  const checkboxes = document.querySelectorAll('.dup-row-check');
+  checkboxes.forEach(cb => cb.checked = checked);
+  updateDupSelectedState();
+}
+
+function updateDupSelectedState() {
+  const checkboxes = Array.from(document.querySelectorAll('.dup-row-check'));
+  const checked = checkboxes.filter(cb => cb.checked);
+  const count = checked.length;
+
+  const countEl = document.getElementById('dup-selected-count');
+  if (countEl) countEl.textContent = count;
+
+  const btn = document.getElementById('dup-delete-selected-btn');
+  if (btn) {
+    btn.disabled = count === 0;
+    btn.style.opacity = count === 0 ? '0.5' : '1';
+    btn.style.cursor = count === 0 ? 'not-allowed' : 'pointer';
+  }
+
+  const selectAll = document.getElementById('dup-select-all');
+  if (selectAll && checkboxes.length > 0) {
+    selectAll.checked = count === checkboxes.length;
+    selectAll.indeterminate = count > 0 && count < checkboxes.length;
+  } else if (selectAll) {
+    selectAll.checked = false;
+    selectAll.indeterminate = false;
+  }
 }
 
 function groupRows(rows, mode = state.dupMode) {
@@ -1533,7 +1625,12 @@ async function runSQL() {
 }
 
 // ── Detail modal ──
-const EDITABLE = ['SPEC_NUM', 'PATIENT_ID', 'SPEC_TYPE', 'ORGANISM', 'FULL_NAME', 'SEX', 'AGE', 'WARD', 'DEPARTMENT', 'COMMENT', 'ESBL', 'CARBAPENEM', 'MRSA', 'URINECOUNT', 'SEROTYPE', 'BETA_LACT', 'INDUC_CLI'];
+const EDITABLE = [
+  'SPEC_NUM', 'PATIENT_ID', 'SPEC_DATE', 'SPEC_TYPE', 'ORGANISM',
+  'FULL_NAME', 'SEX', 'AGE', 'WARD', 'DEPARTMENT', 'INSTITUT',
+  'DATE_ADMIS', 'DATE_DATA', 'COMMENT', 'ESBL', 'CARBAPENEM',
+  'MRSA', 'URINECOUNT', 'SEROTYPE', 'BETA_LACT', 'INDUC_CLI'
+];
 
 async function viewDetail(rowIdx) {
   const data = await api(`/api/isolate/${rowIdx}`);
@@ -1571,8 +1668,11 @@ async function viewDetail(rowIdx) {
         </div>`;
   }).join('')}
     </div>
-    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:8px;">
-      <button class="btn btn-danger btn-sm" onclick="confirmDeleteRow(${r.ROW_IDX}, '${r.SPEC_NUM}');closeModal()">
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal();openEditModal(${r.ROW_IDX})">
+        ✏️ Edit All Fields
+      </button>
+      <button class="btn btn-danger btn-sm" onclick="confirmDeleteRow(${r.ROW_IDX}, '${(r.SPEC_NUM || '').replace(/'/g, "\\'")}');closeModal()">
         Delete This Record
       </button>
     </div>
@@ -1607,12 +1707,85 @@ async function saveEdit(rowIdx, field) {
   } else {
     if (el) el.innerHTML = value || '<span style=color:var(--text3)>—</span>';
     toast(`${field} updated`, 'success');
+    loadStats();
+    loadDuplicates(state.dupsPage);
+    if (state.currentPage === 'isolates') loadIsolates(state.isolatesPage);
   }
 }
 
 function cancelEdit(rowIdx, field, original) {
   const el = document.getElementById(`fv-${rowIdx}-${field}`);
   if (el) el.innerHTML = original || '<span style=color:var(--text3)>—</span>';
+}
+
+// ── Edit Modal for Corrections ──
+async function openEditModal(rowIdx) {
+  const data = await api(`/api/isolate/${rowIdx}`);
+  if (data.error) return toast(data.error, 'error');
+  const r = data.row;
+
+  document.getElementById('edit-modal-title').textContent = `✏️ Edit Isolate #${r.ROW_IDX} — ${r.SPEC_NUM || 'No Specimen #'}`;
+  document.getElementById('edit-row-idx').value = r.ROW_IDX;
+  document.getElementById('edit-spec-num').value = r.SPEC_NUM || '';
+  document.getElementById('edit-patient-id').value = r.PATIENT_ID || '';
+  document.getElementById('edit-full-name').value = r.FULL_NAME || '';
+  document.getElementById('edit-spec-date').value = r.SPEC_DATE ? r.SPEC_DATE.split(' ')[0] : '';
+  document.getElementById('edit-spec-type').value = r.SPEC_TYPE || '';
+  document.getElementById('edit-organism').value = r.ORGANISM || '';
+  document.getElementById('edit-ward').value = r.WARD || '';
+  document.getElementById('edit-department').value = r.DEPARTMENT || '';
+  document.getElementById('edit-sex').value = (r.SEX || '').toLowerCase();
+  document.getElementById('edit-age').value = r.AGE || '';
+  document.getElementById('edit-comment').value = r.COMMENT || '';
+
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('open');
+}
+
+async function saveEditModal(e) {
+  e.preventDefault();
+  const rowIdx = parseInt(document.getElementById('edit-row-idx').value, 10);
+  if (!rowIdx) return;
+
+  const saveBtn = document.getElementById('edit-save-btn');
+  if (saveBtn) saveBtn.disabled = true;
+
+  const fields = {
+    SPEC_NUM: document.getElementById('edit-spec-num').value.trim(),
+    PATIENT_ID: document.getElementById('edit-patient-id').value.trim(),
+    FULL_NAME: document.getElementById('edit-full-name').value.trim(),
+    SPEC_DATE: document.getElementById('edit-spec-date').value.trim(),
+    SPEC_TYPE: document.getElementById('edit-spec-type').value.trim(),
+    ORGANISM: document.getElementById('edit-organism').value.trim(),
+    WARD: document.getElementById('edit-ward').value.trim(),
+    DEPARTMENT: document.getElementById('edit-department').value.trim(),
+    SEX: document.getElementById('edit-sex').value.trim(),
+    AGE: document.getElementById('edit-age').value.trim(),
+    COMMENT: document.getElementById('edit-comment').value.trim()
+  };
+
+  const data = await api('/api/update-row', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ row_idx: rowIdx, fields })
+  });
+
+  if (saveBtn) saveBtn.disabled = false;
+
+  if (data.error) {
+    return toast(data.error, 'error');
+  }
+
+  toast(`Isolate #${rowIdx} successfully updated`, 'success');
+  closeEditModal();
+  loadStats();
+  loadDuplicates(state.dupsPage);
+  if (state.currentPage === 'isolates') {
+    loadIsolates(state.isolatesPage);
+  }
 }
 
 // ── Confirm modal ──
@@ -1655,23 +1828,30 @@ function confirmDeleteDupGroup(specNum) {
   document.getElementById('confirm-modal').classList.add('open');
 }
 
-function confirmDeleteAllDups() {
-  const mode = state.dupMode;
-  const label = mode === 'patient' ? 'PATIENT_ID' : 'SPEC_NUM';
-  document.getElementById('confirm-title').textContent = `Delete ALL Duplicates (${mode === 'patient' ? 'by Patient ID' : 'by Specimen ID'})`;
+function confirmDeleteSelectedDups() {
+  const selectedCheckboxes = Array.from(document.querySelectorAll('.dup-row-check:checked'));
+  const rowIndices = selectedCheckboxes.map(cb => parseInt(cb.value, 10)).filter(n => !isNaN(n));
+  if (!rowIndices.length) {
+    return toast('No isolates selected for deletion', 'warn');
+  }
+
+  document.getElementById('confirm-title').textContent = `Delete ${rowIndices.length} Selected Record(s)`;
   document.getElementById('confirm-body').innerHTML = `
-    <div class="confirm-danger">⚠️ <strong>DANGER:</strong> This will delete ALL duplicate rows across the entire database, keeping only the <strong>first occurrence</strong> (lowest ROW_IDX) per ${label}.<br><br>This action is <strong>irreversible</strong>. Make sure you have a backup of the database file!</div>
+    <div class="confirm-danger">
+      ⚠️ This will permanently delete <strong>${rowIndices.length}</strong> selected isolate(s) from the database.<br><br>
+      This action cannot be undone. Are you sure you want to proceed?
+    </div>
   `;
   state.confirmAction = async () => {
-    const data = await api('/api/delete-duplicates', {
+    const data = await api('/api/delete-rows', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode })
+      body: JSON.stringify({ row_indices: rowIndices })
     });
     if (data.error) return toast(data.error, 'error');
-    toast(`Deleted ${data.changes} duplicate rows`, 'success');
+    toast(`Deleted ${data.changes ?? rowIndices.length} isolate(s)`, 'success');
     loadStats();
-    loadDuplicates(1);
+    loadDuplicates(state.dupsPage);
   };
   document.getElementById('confirm-modal').classList.add('open');
 }
@@ -2163,7 +2343,7 @@ async function loadSampleFromLaunch(sampleFilename) {
 
 // Keyboard shortcuts
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal(); closeConfirm(); }
+  if (e.key === 'Escape') { closeModal(); closeConfirm(); closeEditModal(); }
   if (e.key === 'F5' || (e.ctrlKey && e.key === 'Enter')) {
     const page = document.querySelector('.page.active');
     if (page?.id === 'page-sql') { e.preventDefault(); runSQL(); }
@@ -2177,6 +2357,12 @@ document.getElementById('detail-modal').addEventListener('click', e => {
 document.getElementById('confirm-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('confirm-modal')) closeConfirm();
 });
+const editModalEl = document.getElementById('edit-modal');
+if (editModalEl) {
+  editModalEl.addEventListener('click', e => {
+    if (e.target === editModalEl) closeEditModal();
+  });
+}
 
 // Window-level drag & drop support
 window.addEventListener('dragover', e => {

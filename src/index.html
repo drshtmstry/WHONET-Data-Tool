@@ -411,7 +411,8 @@
                 By Patient ID
               </button>
             </div>
-            <button class="btn btn-danger" onclick="confirmDeleteAllDups()">
+            <button class="btn btn-danger" id="dup-delete-selected-btn" onclick="confirmDeleteSelectedDups()" disabled
+              style="opacity: 0.5; cursor: not-allowed;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -419,7 +420,7 @@
                 <line x1="10" y1="11" x2="10" y2="17"></line>
                 <line x1="14" y1="11" x2="14" y2="17"></line>
               </svg>
-              Delete All Duplicates (Keep First)
+              Delete Selected (<span id="dup-selected-count">0</span>)
             </button>
           </div>
         </div>
@@ -810,6 +811,105 @@
   <!-- Toast Notification Container -->
   <div id="toast-container"></div>
 
+  <!-- Edit Isolate Modal -->
+  <div class="modal-overlay" id="edit-modal">
+    <div class="modal" style="max-width: 680px">
+      <div class="modal-header">
+        <div class="modal-title" id="edit-modal-title">✏️ Edit Isolate Record</div>
+        <div class="modal-close" onclick="closeEditModal()">✕</div>
+      </div>
+      <div class="modal-body" style="padding: 22px 24px;">
+        <form id="edit-isolate-form" onsubmit="saveEditModal(event)">
+          <input type="hidden" id="edit-row-idx" />
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px;">
+            <div class="form-group">
+              <label
+                style="display: block; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; margin-bottom: 5px;">Specimen
+                # (SPEC_NUM)</label>
+              <input type="text" id="edit-spec-num" class="form-input" style="font-family: 'JetBrains Mono', monospace;"
+                required />
+            </div>
+            <div class="form-group">
+              <label
+                style="display: block; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; margin-bottom: 5px;">Patient
+                ID (PATIENT_ID)</label>
+              <input type="text" id="edit-patient-id" class="form-input"
+                style="font-family: 'JetBrains Mono', monospace;" />
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+              <label
+                style="display: block; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; margin-bottom: 5px;">Patient
+                Full Name</label>
+              <input type="text" id="edit-full-name" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label
+                style="display: block; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; margin-bottom: 5px;">Specimen
+                Date</label>
+              <input type="text" id="edit-spec-date" class="form-input" placeholder="YYYY-MM-DD" />
+            </div>
+            <div class="form-group">
+              <label
+                style="display: block; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; margin-bottom: 5px;">Specimen
+                Type</label>
+              <input type="text" id="edit-spec-type" class="form-input"
+                style="font-family: 'JetBrains Mono', monospace;" />
+            </div>
+            <div class="form-group">
+              <label
+                style="display: block; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; margin-bottom: 5px;">Organism
+                Code</label>
+              <input type="text" id="edit-organism" class="form-input"
+                style="font-family: 'JetBrains Mono', monospace;" />
+            </div>
+            <div class="form-group">
+              <label
+                style="display: block; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; margin-bottom: 5px;">Ward
+                / Location</label>
+              <input type="text" id="edit-ward" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label
+                style="display: block; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; margin-bottom: 5px;">Sex</label>
+              <select id="edit-sex" class="form-input">
+                <option value="">—</option>
+                <option value="m">Male (m)</option>
+                <option value="f">Female (f)</option>
+                <option value="u">Unknown (u)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label
+                style="display: block; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; margin-bottom: 5px;">Age</label>
+              <input type="text" id="edit-age" class="form-input" placeholder="e.g. 45, 7d, 3m" />
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+              <label
+                style="display: block; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; margin-bottom: 5px;">Department</label>
+              <input type="text" id="edit-department" class="form-input" />
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+              <label
+                style="display: block; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; margin-bottom: 5px;">Clinical
+                / Correction Comment</label>
+              <input type="text" id="edit-comment" class="form-input" placeholder="Notes about this correction" />
+            </div>
+          </div>
+          <div
+            style="display: flex; gap: 10px; justify-content: flex-end; padding-top: 14px; border-top: 1px solid var(--border);">
+            <button type="button" class="btn btn-ghost" onclick="closeEditModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="edit-save-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Save Corrections
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Isolate Detail Modal -->
   <div class="modal-overlay" id="detail-modal">
     <div class="modal">
@@ -853,7 +953,7 @@
       <div class="modal-header">
         <div class="modal-title" style="display: flex; align-items: center; gap: 12px">
           <img src="/whonet-logo.png" style="height: 32px; width: auto; display: block;" alt="WHONET" />
-          <span>WHONET Data Tool — Welcome &amp; Notice</span>
+          <span>Welcome</span>
         </div>
       </div>
       <div class="modal-body" style="padding: 24px 28px">
@@ -863,7 +963,7 @@
               color: var(--text);
               margin-bottom: 16px;
             ">
-          Welcome to the <strong>WHONET Laboratory Database Quality &amp; Surveillance Utility</strong>.
+          Welcome to the <strong>WHONET Laboratory Database Utility</strong>.
         </div>
 
         <div style="
@@ -903,7 +1003,7 @@
               border: 1px solid var(--border);
               margin-bottom: 24px;
             ">
-          <strong>Legal &amp; Ownership Disclaimer:</strong> WHONET is the property of the <strong>WHO Collaborating
+          <strong>Disclaimer:</strong> WHONET is the property of the <strong>WHO Collaborating
             Centre for Surveillance of Antimicrobial Resistance</strong> (Brigham and Women's Hospital). Copyright ©
           WHONET 1989–2026.<br /><br />
           This independent open-source quality tool is developed by
@@ -917,7 +1017,7 @@
         <div style="display: flex; gap: 12px; justify-content: flex-end">
           <button class="btn btn-primary" onclick="proceedToDataSourceModal()"
             style="padding: 10px 26px; font-size: 14px; font-weight: 700">
-            I Understand &amp; Continue →
+            Continue →
           </button>
         </div>
       </div>
