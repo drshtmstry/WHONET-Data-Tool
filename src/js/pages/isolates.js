@@ -23,7 +23,7 @@ export async function loadIsolates(page = 1) {
   const sortCol = state.isolatesSortCol || 'ROW_IDX';
   const sortDir = state.isolatesSortDir || 'desc';
 
-  const data = await api(`/api/isolates?page=${page}&pageSize=50&search=${search}&organism=${org}&ward=${ward}&sortCol=${sortCol}&sortDir=${sortDir}`);
+  const data = await api(`/api/isolates?page=${page}&pageSize=25&search=${search}&organism=${org}&ward=${ward}&sortCol=${sortCol}&sortDir=${sortDir}`);
   if (data.error) return toast(data.error, 'error');
 
   const countEl = document.getElementById('isolates-count');
@@ -35,7 +35,7 @@ export async function loadIsolates(page = 1) {
     isoBody.scrollTop = 0;
     isoBody.scrollLeft = 0;
   }
-  renderPagination('isolates-pagination', page, data.totalCount, 50, loadIsolates);
+  renderPagination('isolates-pagination', page, data.totalCount, 25, loadIsolates);
 }
 
 export function renderIsolatesTable(rows) {
@@ -73,9 +73,9 @@ export function renderIsolatesTable(rows) {
       <td>${r.CARBAPENEM ? `<span class="badge badge-${r.CARBAPENEM === '+' ? 'r' : 's'}">${r.CARBAPENEM}</span>` : '—'}</td>
       <td>${r.MRSA ? `<span class="badge badge-${r.MRSA === '+' ? 'r' : 's'}">${r.MRSA}</span>` : '—'}</td>
       <td>
-        <button class="btn btn-ghost btn-sm" onclick="openEditModal(${r.ROW_IDX})" title="Edit / correct this isolate">Edit</button>
-        <button class="btn btn-ghost btn-sm" onclick="viewDetail(${r.ROW_IDX})">View</button>
-        <button class="btn btn-danger btn-sm" onclick="confirmDeleteRow(${r.ROW_IDX}, '${(r.SPEC_NUM || '').replace(/'/g, "\\'")}')">Del</button>
+        <button class="btn btn-ghost btn-xs" onclick="openEditModal(${r.ROW_IDX})" title="Edit / correct this isolate">Edit</button>
+        <button class="btn btn-ghost btn-xs" onclick="viewDetail(${r.ROW_IDX})">View</button>
+        <button class="btn btn-danger btn-xs" onclick="confirmDeleteRow(${r.ROW_IDX}, '${(r.SPEC_NUM || '').replace(/'/g, "\\'")}')">Del</button>
       </td>
     </tr>`).join('')}
     </tbody>

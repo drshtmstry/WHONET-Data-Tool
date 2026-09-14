@@ -67,7 +67,7 @@ export async function loadDuplicates(page = 1) {
     casingBanner.style.display = hasMixedCase ? 'flex' : 'none';
   }
 
-  const data = await api(`/api/duplicates?page=${page}&pageSize=200&search=${search}&mode=${mode}${sortParam}`);
+  const data = await api(`/api/duplicates?page=${page}&pageSize=50&search=${search}&mode=${mode}${sortParam}`);
   if (data.error) return toast(data.error, 'error');
 
   const modeLabel = mode === 'patient' ? 'Patient ID' : 'Specimen ID';
@@ -88,7 +88,7 @@ export async function loadDuplicates(page = 1) {
     dupBody.scrollLeft = 0;
   }
   updateDupSelectedState();
-  renderPagination('dup-pagination', page, data.totalCount, 200, loadDuplicates);
+  renderPagination('dup-pagination', page, data.totalCount, 50, loadDuplicates);
 }
 
 export function renderDuplicatesTable(rows, mode = state.dupMode) {
@@ -157,9 +157,9 @@ export function renderDuplicatesTable(rows, mode = state.dupMode) {
               <td>${r.AGE || '—'}</td>
               <td>${r.WARD || '—'}</td>
               <td style="text-align: right; white-space: nowrap;">
-                <button class="btn btn-ghost btn-sm" onclick="openEditModal(${r.ROW_IDX})" title="Edit / correct this isolate">Edit</button>
-                <button class="btn btn-ghost btn-sm" onclick="viewDetail(${r.ROW_IDX})" title="View isolate details">View</button>
-                <button class="btn btn-danger btn-sm" onclick="confirmDeleteRow(${r.ROW_IDX}, '${safeSpecNum}')" title="Delete this isolate">Del</button>
+                <button class="btn btn-ghost btn-xs" onclick="openEditModal(${r.ROW_IDX})" title="Edit / correct this isolate">Edit</button>
+                <button class="btn btn-ghost btn-xs" onclick="viewDetail(${r.ROW_IDX})" title="View isolate details">View</button>
+                <button class="btn btn-danger btn-xs" onclick="confirmDeleteRow(${r.ROW_IDX}, '${safeSpecNum}')" title="Delete this isolate">Del</button>
               </td>
             </tr>`;
         }).join('')}

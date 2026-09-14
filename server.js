@@ -220,7 +220,6 @@ function handleRequest(req, res) {
 
   if (
     path === "/dev-icon.png" ||
-    path === "/dev-icon.ico" ||
     path === "/favicon.ico" ||
     path === "/favicon.png" ||
     path === "/apple-touch-icon.png"
@@ -562,7 +561,7 @@ function handleRequest(req, res) {
       return sendJson(res, { error: "No database open" }, 400);
     try {
       const page = parseInt(urlObj.searchParams.get("page") || "1");
-      const pageSize = parseInt(urlObj.searchParams.get("pageSize") || "50");
+      const pageSize = parseInt(urlObj.searchParams.get("pageSize") || "25");
       const search = (urlObj.searchParams.get("search") || "").replace(
         /'/g,
         "''",

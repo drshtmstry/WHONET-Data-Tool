@@ -53,7 +53,7 @@ export function handleWasmApi(path, options = {}) {
 
     if (pathname === '/api/isolates') {
       const page = parseInt(url.searchParams.get('page') || '1', 10);
-      const pageSize = parseInt(url.searchParams.get('pageSize') || '50', 10);
+      const pageSize = parseInt(url.searchParams.get('pageSize') || '25', 10);
       const search = (url.searchParams.get('search') || '').trim();
       const organism = (url.searchParams.get('organism') || '').trim();
       const ward = (url.searchParams.get('ward') || '').trim();
@@ -117,7 +117,7 @@ export function handleWasmApi(path, options = {}) {
 
     if (pathname === '/api/duplicates') {
       const page = parseInt(url.searchParams.get('page') || '1', 10);
-      const pageSize = parseInt(url.searchParams.get('pageSize') || '200', 10);
+      const pageSize = parseInt(url.searchParams.get('pageSize') || '50', 10);
       const mode = (url.searchParams.get('mode') || 'spec').toLowerCase();
       const search = (url.searchParams.get('search') || '').trim();
       const offset = (page - 1) * pageSize;
