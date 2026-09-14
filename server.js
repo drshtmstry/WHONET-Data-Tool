@@ -1,4 +1,6 @@
 import { createServer } from "node:http";
+import express from "express";
+import cors from "cors";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -79,14 +81,16 @@ function withDb(callback) {
   try {
     db.exec("PRAGMA busy_timeout = 5000;");
     db.function("NATURAL_KEY", (str) => {
-      if (str === null || str === undefined) return '';
-      return String(str).toLowerCase().replace(/\d+/g, (m) => m.padStart(12, '0'));
+      if (str === null || str === undefined) return "";
+      return String(str)
+        .toLowerCase()
+        .replace(/\d+/g, (m) => m.padStart(12, "0"));
     });
     return callback(db);
   } finally {
     try {
       db.close();
-    } catch (_) { }
+    } catch (_) {}
   }
 }
 
@@ -107,6 +111,16 @@ function sendHtml(res, html) {
   });
   res.end(html);
 }
+
+const staticMiddleware = express.static(join(__dirname, "src"), {
+  index: "index.html",
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith(".html") || filePath.endsWith(".js") || filePath.endsWith(".css")) {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    }
+  }
+});
+const publicMiddleware = express.static(join(__dirname, "public"));
 
 function handleRequest(req, res) {
   const urlObj = new URL(req.url, `http://localhost`);
@@ -135,152 +149,17 @@ function handleRequest(req, res) {
     return;
   }
 
-  // Serve frontend files from src/ (or root fallback) with no-cache headers so edits are instant
-  if (path === "/" || path === "/index.html") {
-    const indexPath = existsSync(join(__dirname, "src", "index.html"))
-      ? join(__dirname, "src", "index.html")
-      : join(__dirname, "index.html");
-    const html = readFileSync(indexPath, "utf8");
-    res.writeHead(200, {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "no-cache, no-store, must-revalidate",
-      "Content-Length": Buffer.byteLength(html),
+  // Standard Express static serving
+  staticMiddleware(req, res, () => {
+    publicMiddleware(req, res, () => {
+      handleApi(req, res);
     });
-    return res.end(html);
-  }
+  });
+}
 
-  if (path === "/styles.css") {
-    const cssPath = existsSync(join(__dirname, "src", "styles.css"))
-      ? join(__dirname, "src", "styles.css")
-      : join(__dirname, "styles.css");
-    if (existsSync(cssPath)) {
-      const css = readFileSync(cssPath, "utf8");
-      res.writeHead(200, {
-        "Content-Type": "text/css; charset=utf-8",
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-      });
-      return res.end(css);
-    }
-  }
-
-  if (path.startsWith("/js/")) {
-    const safePath = join(__dirname, "src", path);
-    if (existsSync(safePath)) {
-      const js = readFileSync(safePath, "utf8");
-      res.writeHead(200, {
-        "Content-Type": "application/javascript; charset=utf-8",
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-      });
-      return res.end(js);
-    }
-  }
-
-
-  if (path === "/organisms.js") {
-    const orgPath = existsSync(join(__dirname, "src", "organisms.js"))
-      ? join(__dirname, "src", "organisms.js")
-      : join(__dirname, "organisms.js");
-    if (existsSync(orgPath)) {
-      const js = readFileSync(orgPath, "utf8");
-      res.writeHead(200, {
-        "Content-Type": "application/javascript; charset=utf-8",
-        "Cache-Control": "public, max-age=86400",
-      });
-      return res.end(js);
-    }
-  }
-
-  if (path === "/chart.umd.min.js") {
-    const chartPath = existsSync(join(__dirname, "src", "chart.umd.min.js"))
-      ? join(__dirname, "src", "chart.umd.min.js")
-      : join(__dirname, "chart.umd.min.js");
-    if (existsSync(chartPath)) {
-      const js = readFileSync(chartPath, "utf8");
-      res.writeHead(200, {
-        "Content-Type": "application/javascript; charset=utf-8",
-        "Cache-Control": "public, max-age=86400",
-      });
-      return res.end(js);
-    }
-  }
-
-  if (path === "/whonet-logo.png") {
-    const logoPath = existsSync(join(__dirname, "src", "whonet-logo.png"))
-      ? join(__dirname, "src", "whonet-logo.png")
-      : join(__dirname, "whonet-logo.png");
-    if (existsSync(logoPath)) {
-      const img = readFileSync(logoPath);
-      res.writeHead(200, {
-        "Content-Type": "image/png",
-        "Cache-Control": "public, max-age=86400",
-      });
-      return res.end(img);
-    }
-  }
-
-  if (
-    path === "/dev-icon.png" ||
-    path === "/favicon.ico" ||
-    path === "/favicon.png" ||
-    path === "/apple-touch-icon.png"
-  ) {
-    const iconPath = existsSync(join(__dirname, "src", path.slice(1)))
-      ? join(__dirname, "src", path.slice(1))
-      : join(__dirname, path.slice(1));
-    if (existsSync(iconPath)) {
-      const img = readFileSync(iconPath);
-      const mime = path.endsWith(".ico") ? "image/x-icon" : "image/png";
-      res.writeHead(200, {
-        "Content-Type": mime,
-        "Cache-Control": "public, max-age=86400",
-      });
-      return res.end(img);
-    }
-  }
-
-  if (path.startsWith("/vendor/")) {
-    const filename = basename(path);
-    const vendorPath = join(__dirname, "src", "vendor", filename);
-    if (existsSync(vendorPath)) {
-      const data = readFileSync(vendorPath);
-      const contentType = filename.endsWith(".wasm")
-        ? "application/wasm"
-        : "application/javascript; charset=utf-8";
-      res.writeHead(200, {
-        "Content-Type": contentType,
-        "Cache-Control": "public, max-age=86400",
-      });
-      return res.end(data);
-    }
-  }
-
-  if (path.startsWith("/sample-data/")) {
-    const filename = basename(path);
-    const candidates = [
-      join(__dirname, "src", path),
-      join(__dirname, "public", path),
-      join(__dirname, path),
-      join(WHONET_DIR, filename),
-    ];
-    for (const samplePath of candidates) {
-      if (existsSync(samplePath)) {
-        const data = readFileSync(samplePath);
-        res.writeHead(200, {
-          "Content-Type": "application/x-sqlite3",
-          "Cache-Control": "public, max-age=86400",
-        });
-        return res.end(data);
-      }
-    }
-  }
-
-  if (path.startsWith("/public/")) {
-    const assetPath = join(__dirname, path);
-    if (existsSync(assetPath)) {
-      const data = readFileSync(assetPath);
-      return res.end(data);
-    }
-  }
+function handleApi(req, res) {
+  const urlObj = new URL(req.url, `http://localhost`);
+  const path = urlObj.pathname;
 
   if (path === "/api/schema" && req.method === "GET") {
     if (!currentDbFullPath)
@@ -288,7 +167,9 @@ function handleRequest(req, res) {
     try {
       withDb((db) => {
         const tables = db
-          .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+          )
           .all()
           .map((t) => t.name);
         const columns = {};
@@ -481,30 +362,32 @@ function handleRequest(req, res) {
       }
 
       const ALLOWED_DUP_COLS = {
-        ROW_IDX: 'ROW_IDX',
+        ROW_IDX: "ROW_IDX",
         MATCHED: groupCol,
-        OTHER: mode === 'patient' ? 'UPPER(SPEC_NUM)' : 'UPPER(PATIENT_ID)',
-        SPEC_NUM: 'SPEC_NUM',
-        PATIENT_ID: 'PATIENT_ID',
-        FULL_NAME: 'FULL_NAME',
-        SPEC_DATE: 'SPEC_DATE',
-        SPEC_TYPE: 'SPEC_TYPE',
-        ORGANISM: 'ORGANISM',
-        SEX: 'SEX',
-        AGE: 'AGE',
-        WARD: 'WARD'
+        OTHER: mode === "patient" ? "UPPER(SPEC_NUM)" : "UPPER(PATIENT_ID)",
+        SPEC_NUM: "SPEC_NUM",
+        PATIENT_ID: "PATIENT_ID",
+        FULL_NAME: "FULL_NAME",
+        SPEC_DATE: "SPEC_DATE",
+        SPEC_TYPE: "SPEC_TYPE",
+        ORGANISM: "ORGANISM",
+        SEX: "SEX",
+        AGE: "AGE",
+        WARD: "WARD",
       };
       const rawDupSort = urlObj.searchParams.get("sortCol")?.toUpperCase();
       const dupSortExpr = ALLOWED_DUP_COLS[rawDupSort] || null;
-      const rawDupDir = (urlObj.searchParams.get("sortDir") || "ASC").toUpperCase();
+      const rawDupDir = (
+        urlObj.searchParams.get("sortDir") || "ASC"
+      ).toUpperCase();
       const dupSortDir = rawDupDir === "DESC" ? "DESC" : "ASC";
 
       let orderClause = `ORDER BY NATURAL_KEY(${groupCol}), row_num`;
       if (dupSortExpr) {
-        if (rawDupSort === 'MATCHED') {
+        if (rawDupSort === "MATCHED") {
           orderClause = `ORDER BY NATURAL_KEY(${groupCol}) ${dupSortDir}, row_num`;
         } else {
-          const clusterAgg = dupSortDir === 'DESC' ? 'MAX' : 'MIN';
+          const clusterAgg = dupSortDir === "DESC" ? "MAX" : "MIN";
           const clusterValExpr = `${clusterAgg}(NATURAL_KEY(${dupSortExpr})) OVER (PARTITION BY ${groupCol})`;
           orderClause = `ORDER BY 
             CASE WHEN ${clusterValExpr} IS NULL OR ${clusterValExpr} = '' THEN 1 ELSE 0 END,
@@ -574,28 +457,33 @@ function handleRequest(req, res) {
       const offset = (page - 1) * pageSize;
 
       const ALLOWED_ISOLATE_COLS = {
-        ROW_IDX: 'ROW_IDX',
-        SPEC_NUM: 'SPEC_NUM',
-        SPEC_DATE: 'SPEC_DATE',
-        SPEC_TYPE: 'SPEC_TYPE',
-        ORGANISM: 'ORGANISM',
-        FULL_NAME: 'FULL_NAME',
-        SEX: 'SEX',
-        AGE: 'AGE',
-        WARD: 'WARD',
-        DEPARTMENT: 'DEPARTMENT',
-        ESBL: 'ESBL',
-        CARBAPENEM: 'CARBAPENEM',
-        MRSA: 'MRSA'
+        ROW_IDX: "ROW_IDX",
+        SPEC_NUM: "SPEC_NUM",
+        SPEC_DATE: "SPEC_DATE",
+        SPEC_TYPE: "SPEC_TYPE",
+        ORGANISM: "ORGANISM",
+        FULL_NAME: "FULL_NAME",
+        SEX: "SEX",
+        AGE: "AGE",
+        WARD: "WARD",
+        DEPARTMENT: "DEPARTMENT",
+        ESBL: "ESBL",
+        CARBAPENEM: "CARBAPENEM",
+        MRSA: "MRSA",
       };
-      const rawSortCol = (urlObj.searchParams.get("sortCol") || "ROW_IDX").toUpperCase();
+      const rawSortCol = (
+        urlObj.searchParams.get("sortCol") || "ROW_IDX"
+      ).toUpperCase();
       const sortCol = ALLOWED_ISOLATE_COLS[rawSortCol] || "ROW_IDX";
-      const rawSortDir = (urlObj.searchParams.get("sortDir") || "DESC").toUpperCase();
+      const rawSortDir = (
+        urlObj.searchParams.get("sortDir") || "DESC"
+      ).toUpperCase();
       const sortDir = rawSortDir === "ASC" ? "ASC" : "DESC";
 
-      const orderClause = sortCol === "ROW_IDX"
-        ? `ORDER BY ROW_IDX ${sortDir}`
-        : `ORDER BY CASE WHEN ${sortCol} IS NULL OR ${sortCol} = '' THEN 1 ELSE 0 END, NATURAL_KEY(${sortCol}) ${sortDir}, ROW_IDX DESC`;
+      const orderClause =
+        sortCol === "ROW_IDX"
+          ? `ORDER BY ROW_IDX ${sortDir}`
+          : `ORDER BY CASE WHEN ${sortCol} IS NULL OR ${sortCol} = '' THEN 1 ELSE 0 END, NATURAL_KEY(${sortCol}) ${sortDir}, ROW_IDX DESC`;
 
       const conditions = [];
       if (search)
@@ -868,7 +756,7 @@ function handleRequest(req, res) {
 
         const whereSql = whereClauses.length
           ? `WHERE ${selectExpr} IS NOT NULL AND ${selectExpr} != '' AND ` +
-          whereClauses.join(" AND ")
+            whereClauses.join(" AND ")
           : `WHERE ${selectExpr} IS NOT NULL AND ${selectExpr} != ''`;
 
         const querySql = `
@@ -1103,7 +991,7 @@ function handleRequest(req, res) {
         withDb((db) => {
           const placeholders = row_indices.map(() => "?").join(",");
           const stmt = db.prepare(
-            `DELETE FROM Isolates WHERE ROW_IDX IN (${placeholders})`
+            `DELETE FROM Isolates WHERE ROW_IDX IN (${placeholders})`,
           );
           const result = stmt.run(...row_indices);
           sendJson(res, { ok: true, changes: result.changes });
@@ -1209,7 +1097,7 @@ function handleRequest(req, res) {
         params.push(row_idx);
         withDb((db) => {
           const stmt = db.prepare(
-            `UPDATE Isolates SET ${updates.join(", ")} WHERE ROW_IDX = ?`
+            `UPDATE Isolates SET ${updates.join(", ")} WHERE ROW_IDX = ?`,
           );
           const result = stmt.run(...params);
           sendJson(res, { ok: true, changes: result.changes });
@@ -1231,13 +1119,13 @@ function openBrowser(url) {
     if (process.platform === "win32") {
       exec(`cmd.exe /c start "" "${url}"`, (err) => {
         if (err) {
-          exec(`powershell.exe -Command "Start-Process '${url}'"`, () => { });
+          exec(`powershell.exe -Command "Start-Process '${url}'"`, () => {});
         }
       });
     } else if (process.platform === "darwin") {
-      exec(`open "${url}"`, () => { });
+      exec(`open "${url}"`, () => {});
     } else {
-      exec(`xdg-open "${url}"`, () => { });
+      exec(`xdg-open "${url}"`, () => {});
     }
   } catch (e) {
     console.error("Auto-open failed:", e.message);
