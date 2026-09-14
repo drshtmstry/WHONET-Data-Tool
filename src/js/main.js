@@ -86,13 +86,34 @@ export function toggleTheme() {
 export function updateThemeToggleBtn(theme) {
   const btn = document.getElementById('theme-toggle-btn');
   if (btn) {
-    btn.innerHTML = theme === 'dark' ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
-    btn.title = theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+    const icon = btn.querySelector('i');
+    const label = btn.querySelector('#theme-toggle-label');
+    const isDark = theme === 'dark';
+    if (icon) icon.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+    if (label) label.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+    btn.title = isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+    btn.setAttribute('aria-label', btn.title);
   }
+}
+
+export function toggleMobileSidebar(force) {
+  const sidebar = document.getElementById('app-sidebar');
+  const toggle = document.querySelector('.mobile-nav-toggle');
+  const backdrop = document.querySelector('.mobile-sidebar-backdrop');
+  if (!sidebar || !toggle || !backdrop) return;
+
+  const isOpen = typeof force === 'boolean' ? force : !sidebar.classList.contains('open');
+  sidebar.classList.toggle('open', isOpen);
+  backdrop.classList.toggle('open', isOpen);
+  toggle.setAttribute('aria-expanded', String(isOpen));
+  toggle.setAttribute('aria-label', isOpen ? 'Close navigation' : 'Open navigation');
+  toggle.setAttribute('title', isOpen ? 'Close navigation' : 'Open navigation');
+  document.body.classList.toggle('mobile-nav-open', isOpen);
 }
 
 // ── Page Routing ──
 export function showPage(name) {
+  toggleMobileSidebar(false);
   state.currentPage = name;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -224,6 +245,7 @@ window.addEventListener('beforeunload', e => {
 Object.assign(window, {
   state,
   showPage,
+  toggleMobileSidebar,
   toggleTheme,
   switchDb,
   renderDbSelector,

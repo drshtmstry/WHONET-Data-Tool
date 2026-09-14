@@ -3,8 +3,7 @@
   "cleanUrls": true,
   "routes": [
     {
-      "src": "/sample-data/(.*)",
-      "dest": "/public/sample-data/$1"
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
