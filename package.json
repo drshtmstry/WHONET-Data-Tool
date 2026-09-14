@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "vite",
+    "dev:server": "node --watch server.js",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "keywords": [
     "whonet",
@@ -20,5 +23,8 @@
   "license": "MIT",
   "dependencies": {
     "sql.js": "^1.14.2"
+  },
+  "devDependencies": {
+    "vite": "^7.3.6"
   }
 }

@@ -39,7 +39,7 @@
   </script>
 
   <!-- sql.js WASM for 100% in-browser offline / web client support -->
-  <script src="vendor/sql-wasm.js"></script>
+  <script src="/vendor/sql-wasm.js"></script>
   <!-- Chart.js for dynamic surveillance analytics -->
   <script src="/chart.umd.min.js" onerror="
         this.onerror = null;
@@ -164,6 +164,7 @@
         SQL Console
       </div>
 
+      <div class="nav-section">Theme</div>
       <button type="button" class="nav-item theme-sidebar-entry" id="theme-toggle-btn" onclick="toggleTheme()"
         title="Switch to Dark Mode" aria-label="Switch to Dark Mode">
         <i class="fa-solid fa-moon" aria-hidden="true"></i>
@@ -1196,7 +1197,7 @@
     </div>
   </div>
 
-  <script src="organisms.js"></script>
+  <script src="/organisms.js"></script>
   <script type="module" src="js/main.js"></script>
   <script>
     // Live reload client for active dev tabs

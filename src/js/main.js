@@ -4,7 +4,7 @@
  */
 
 // ── State & API ──
-import { state, setRuntimeBadge, updateCurrentFileDisplay } from './state/store.js';
+import { state, isLocalHost, setRuntimeBadge, updateCurrentFileDisplay } from './state/store.js';
 import { api, API_BASE } from './api/client.js';
 
 // ── Utils & UI Helpers ──
@@ -154,23 +154,25 @@ export async function init() {
   initTheme();
   initSqlAutocomplete();
 
-  try {
-    const res = await fetch(API_BASE + '/api/databases');
-    const data = await res.json();
-    if (data && Array.isArray(data.databases)) {
-      state.isWasmMode = false;
-      state.databases = data.databases;
-      state.currentDb = data.current;
-      setRuntimeBadge('Local Server Connected', true);
-      renderDbSelector();
-      if (state.currentDb) {
-        await loadStats();
-        refreshSqlSchema();
+  if (isLocalHost) {
+    try {
+      const res = await fetch(API_BASE + '/api/databases');
+      const data = await res.json();
+      if (data && Array.isArray(data.databases)) {
+        state.isWasmMode = false;
+        state.databases = data.databases;
+        state.currentDb = data.current;
+        setRuntimeBadge('Local Server Connected', true);
+        renderDbSelector();
+        if (state.currentDb) {
+          await loadStats();
+          refreshSqlSchema();
+        }
+        return;
       }
-      return;
+    } catch (e) {
+      console.info('Local server unavailable, enabling in-browser SQLite mode:', e.message);
     }
-  } catch (e) {
-    console.info('Local server not found or running on web, enabling in-browser SQLite mode:', e.message);
   }
 
   // Fallback to in-browser WASM mode
