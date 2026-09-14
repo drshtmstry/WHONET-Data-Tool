@@ -19,8 +19,6 @@
   "author": "Dr. Darshit Mistry",
   "license": "MIT",
   "dependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
     "sql.js": "^1.14.2"
   }
 }

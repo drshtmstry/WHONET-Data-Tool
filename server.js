@@ -1,13 +1,10 @@
 import { createServer } from "node:http";
-import express from "express";
-import cors from "cors";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join, basename } from "node:path";
+import { dirname, join, basename, extname } from "node:path";
 import { URL } from "node:url";
 import { exec } from "node:child_process";
-
 import { watch } from "node:fs";
 
 const __dirname = process.pkg
@@ -112,15 +109,21 @@ function sendHtml(res, html) {
   res.end(html);
 }
 
-const staticMiddleware = express.static(join(__dirname, "src"), {
-  index: "index.html",
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith(".html") || filePath.endsWith(".js") || filePath.endsWith(".css")) {
-      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    }
-  }
-});
-const publicMiddleware = express.static(join(__dirname, "public"));
+const MIME_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".mjs": "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".wasm": "application/wasm",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".sqlite": "application/x-sqlite3",
+  ".sqlite3": "application/x-sqlite3",
+};
 
 function handleRequest(req, res) {
   const urlObj = new URL(req.url, `http://localhost`);
@@ -149,12 +152,38 @@ function handleRequest(req, res) {
     return;
   }
 
-  // Standard Express static serving
-  staticMiddleware(req, res, () => {
-    publicMiddleware(req, res, () => {
-      handleApi(req, res);
-    });
-  });
+  // Handle static assets natively from src/, public/, or root
+  const reqPath = path === "/" ? "/index.html" : path;
+  const candidates = [
+    join(__dirname, "src", reqPath),
+    join(__dirname, "public", reqPath),
+    join(__dirname, reqPath),
+  ];
+  if (reqPath.startsWith("/src/")) {
+    candidates.unshift(join(__dirname, "src", reqPath.slice(5)));
+  }
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      try {
+        const ext = extname(candidate).toLowerCase();
+        const contentType = MIME_TYPES[ext] || "application/octet-stream";
+        const isDynamicDev = ext === ".html" || ext === ".js" || ext === ".css";
+        const data = readFileSync(candidate);
+        res.writeHead(200, {
+          "Content-Type": contentType,
+          "Access-Control-Allow-Origin": "*",
+          "Cache-Control": isDynamicDev
+            ? "no-cache, no-store, must-revalidate"
+            : "public, max-age=86400",
+          "Content-Length": Buffer.byteLength(data),
+        });
+        return res.end(data);
+      } catch (_) {}
+    }
+  }
+
+  handleApi(req, res);
 }
 
 function handleApi(req, res) {
