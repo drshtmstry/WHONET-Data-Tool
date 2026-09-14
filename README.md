@@ -51,6 +51,7 @@ vercel.json       Vercel routing
 
 ## Disclaimer
 
-**WHONET** is the intellectual property of the WHO Collaborating Centre for Surveillance of Antimicrobial Resistance (Brigham and Women's Hospital). Copyright © WHONET 1989–2026. [whonet.org](https://whonet.org)
+**WHONET** is the intellectual property of the WHO Collaborating Centre for Surveillance of Antimicrobial Resistance (Brigham and Women's Hospital). [whonet.org](https://whonet.org)
 
-This tool is an independent open-source utility by [Dr. Darshit Mistry](https://drshtmstry.github.io/).
+This project is an independent open-source utility by [Dr. Darshit Mistry](https://drshtmstry.github.io/) and is not affiliated with, endorsed by, or sponsored by WHONET.
+
