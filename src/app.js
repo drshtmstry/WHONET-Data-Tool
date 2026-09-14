@@ -48,7 +48,7 @@ function toggleTheme() {
 function updateThemeToggleBtn(theme) {
   const btn = document.getElementById('theme-toggle-btn');
   if (btn) {
-    btn.innerHTML = theme === 'dark' ? '☀️' : '🌙';
+    btn.innerHTML = theme === 'dark' ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
     btn.title = theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
   }
 }
@@ -81,7 +81,7 @@ function updateCurrentFileDisplay(filename) {
       dbLabel.innerHTML = `
         <div class="current-file-pill" title="Active SQLite Database: ${escapeHtml(filename)}">
           <span class="current-file-dot"></span>
-          <span class="current-file-icon">🗄️</span>
+          <span class="current-file-icon"><i class="fa-solid fa-database"></i></span>
           <span class="current-file-name">${escapeHtml(filename)}</span>
           <span class="current-file-status">Active</span>
         </div>
@@ -92,8 +92,20 @@ function updateCurrentFileDisplay(filename) {
   }
 
   const dropSub = document.getElementById('dropzone-sub');
-  if (dropSub && filename) {
-    dropSub.innerHTML = `Active dataset: <span class="current-file-chip">🗄️ ${escapeHtml(filename)}</span><br>• Drop any <code>.sqlite</code> file to replace or switch`;
+  if (dropSub) {
+    if (filename) {
+      dropSub.innerHTML = `
+        <div class="db-dropzone-dataset-row">
+          <span>Active dataset:</span>
+          <span class="current-file-chip"><i class="fa-solid fa-database"></i> ${escapeHtml(filename)}</span>
+        </div>
+        <div class="db-dropzone-hint-row">
+          • Drop any <code>.sqlite</code> file to replace or switch
+        </div>
+      `;
+    } else {
+      dropSub.innerHTML = 'Works directly with standard WHONET files from <code>C:\\WHONET\\Data</code> or custom folders/downloads.';
+    }
   }
 }
 
@@ -116,8 +128,12 @@ function renderOrgBadge(code, extraStyle = '') {
 function toast(msg, type = 'info') {
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  const icons = { success: '✓', error: '✗', info: 'ℹ' };
-  el.innerHTML = `<span>${icons[type]}</span> ${msg}`;
+  const icons = {
+    success: '<i class="fa-solid fa-check"></i>',
+    error: '<i class="fa-solid fa-circle-xmark"></i>',
+    info: '<i class="fa-solid fa-circle-info"></i>'
+  };
+  el.innerHTML = `<span>${icons[type] || icons.info}</span> ${msg}`;
   document.getElementById('toast-container').appendChild(el);
   setTimeout(() => el.remove(), 3800);
 }
@@ -197,9 +213,9 @@ async function autoSaveToHandle() {
     // Brief visual feedback on the badge
     const badge = document.getElementById('runtime-badge');
     if (badge) {
-      const prev = badge.textContent;
-      badge.textContent = '✅ Auto-saved';
-      setTimeout(() => { badge.textContent = prev; }, 1500);
+      const prev = badge.innerHTML;
+      badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> Auto-saved';
+      setTimeout(() => { badge.innerHTML = prev; }, 1500);
     }
   } catch (err) {
     console.warn('Auto-save failed, falling back to manual save:', err.message);
@@ -220,13 +236,13 @@ function markModified() {
           saveBtn.style.display = 'inline-flex';
           saveBtn.classList.remove('btn-outline');
           saveBtn.classList.add('btn-success');
-          saveBtn.innerHTML = '💾 Save to File';
+          saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to File';
         }
       }).catch(() => {
         saveBtn.style.display = 'inline-flex';
         saveBtn.classList.remove('btn-outline');
         saveBtn.classList.add('btn-success');
-        saveBtn.innerHTML = '💾 Save to File';
+        saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to File';
       });
     } else {
       saveBtn.style.display = 'none';
@@ -275,10 +291,10 @@ async function saveToFileHandle() {
 
     if (saveBtn) {
       saveBtn.disabled = false;
-      saveBtn.innerHTML = '💾 Saved ✓';
+      saveBtn.innerHTML = '<i class="fa-solid fa-check"></i> Saved';
       setTimeout(() => {
         if (!state.isModified && saveBtn) {
-          saveBtn.innerHTML = '💾 Save to File';
+          saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to File';
         }
       }, 2500);
     }
@@ -288,7 +304,7 @@ async function saveToFileHandle() {
     }
     if (saveBtn) {
       saveBtn.disabled = false;
-      saveBtn.innerHTML = '💾 Save to File';
+      saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to File';
     }
   }
 }
@@ -951,7 +967,7 @@ async function handleFileUpload(file, fileHandle = null) {
     if (saveBtn) {
       if (fileHandle && typeof fileHandle.createWritable === 'function') {
         saveBtn.style.display = 'inline-flex';
-        saveBtn.innerHTML = '💾 Save to File';
+        saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to File';
       } else {
         saveBtn.style.display = 'none';
       }
@@ -1298,7 +1314,7 @@ async function loadIsolates(page = 1) {
 }
 
 function renderIsolatesTable(rows) {
-  if (!rows.length) return `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No records found</div></div>`;
+  if (!rows.length) return `<div class="empty"><div class="empty-icon"><i class="fa-solid fa-magnifying-glass"></i></div><div class="empty-title">No records found</div></div>`;
   return `<table>
     <thead><tr>
       <th>Row</th><th>Specimen #</th><th>Date</th><th>Type</th><th>Organism</th>
@@ -1400,7 +1416,7 @@ async function loadDuplicates(page = 1) {
 function renderDuplicatesTable(rows, mode = state.dupMode) {
   const modeLabel = mode === 'patient' ? 'Patient ID' : 'Specimen ID';
   if (!rows || !rows.length) {
-    return `<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No duplicates found by ${modeLabel}!</div></div>`;
+    return `<div class="empty"><div class="empty-icon" style="color:var(--green)"><i class="fa-solid fa-circle-check"></i></div><div class="empty-title">No duplicates found by ${modeLabel}!</div></div>`;
   }
 
   let lastGroupKey = null;
@@ -1560,7 +1576,7 @@ async function bulkFix(op) {
   const item = document.createElement('div');
   item.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:12px;';
   item.innerHTML = `
-    <span style="color:var(--green);font-size:18px">✓</span>
+    <span style="color:var(--green);font-size:16px"><i class="fa-solid fa-check"></i></span>
     <div style="flex:1">
       <div style="font-weight:600;font-size:13.5px">${data.description}</div>
       <div style="font-size:12px;color:var(--text3)">${data.changes} rows affected · ${new Date().toLocaleTimeString()}</div>
@@ -1670,7 +1686,7 @@ async function viewDetail(rowIdx) {
     </div>
     <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">
       <button class="btn btn-ghost btn-sm" onclick="closeModal();openEditModal(${r.ROW_IDX})">
-        ✏️ Edit All Fields
+        <i class="fa-solid fa-pen-to-square"></i> Edit All Fields
       </button>
       <button class="btn btn-danger btn-sm" onclick="confirmDeleteRow(${r.ROW_IDX}, '${(r.SPEC_NUM || '').replace(/'/g, "\\'")}');closeModal()">
         Delete This Record
@@ -1724,7 +1740,7 @@ async function openEditModal(rowIdx) {
   if (data.error) return toast(data.error, 'error');
   const r = data.row;
 
-  document.getElementById('edit-modal-title').textContent = `✏️ Edit Isolate #${r.ROW_IDX} — ${r.SPEC_NUM || 'No Specimen #'}`;
+  document.getElementById('edit-modal-title').innerHTML = `<i class="fa-solid fa-pen-to-square"></i> Edit Isolate #${r.ROW_IDX} — ${escapeHtml(r.SPEC_NUM || 'No Specimen #')}`;
   document.getElementById('edit-row-idx').value = r.ROW_IDX;
   document.getElementById('edit-spec-num').value = r.SPEC_NUM || '';
   document.getElementById('edit-patient-id').value = r.PATIENT_ID || '';
@@ -1792,7 +1808,7 @@ async function saveEditModal(e) {
 function confirmDeleteRow(rowIdx, specNum) {
   document.getElementById('confirm-title').textContent = 'Delete Record';
   document.getElementById('confirm-body').innerHTML = `
-    <div class="confirm-danger">⚠️ This will permanently delete isolate <strong>#${rowIdx}</strong> (Specimen: <strong>${specNum}</strong>).<br><br>This action cannot be undone.</div>
+    <div class="confirm-danger"><i class="fa-solid fa-triangle-exclamation"></i> This will permanently delete isolate <strong>#${rowIdx}</strong> (Specimen: <strong>${specNum}</strong>).<br><br>This action cannot be undone.</div>
   `;
   state.confirmAction = async () => {
     const data = await api('/api/delete-row', {
@@ -1812,7 +1828,7 @@ function confirmDeleteRow(rowIdx, specNum) {
 function confirmDeleteDupGroup(specNum) {
   document.getElementById('confirm-title').textContent = 'Keep Only First Record';
   document.getElementById('confirm-body').innerHTML = `
-    <div class="confirm-danger">⚠️ This will delete all <strong>duplicate records</strong> for Specimen # <strong>${specNum}</strong>, keeping only the first (lowest ROW_IDX).<br><br>This action cannot be undone.</div>
+    <div class="confirm-danger"><i class="fa-solid fa-triangle-exclamation"></i> This will delete all <strong>duplicate records</strong> for Specimen # <strong>${specNum}</strong>, keeping only the first (lowest ROW_IDX).<br><br>This action cannot be undone.</div>
   `;
   state.confirmAction = async () => {
     const data = await api('/api/delete-duplicates', {
@@ -1838,7 +1854,7 @@ function confirmDeleteSelectedDups() {
   document.getElementById('confirm-title').textContent = `Delete ${rowIndices.length} Selected Record(s)`;
   document.getElementById('confirm-body').innerHTML = `
     <div class="confirm-danger">
-      ⚠️ This will permanently delete <strong>${rowIndices.length}</strong> selected isolate(s) from the database.<br><br>
+      <i class="fa-solid fa-triangle-exclamation"></i> This will permanently delete <strong>${rowIndices.length}</strong> selected isolate(s) from the database.<br><br>
       This action cannot be undone. Are you sure you want to proceed?
     </div>
   `;
@@ -2081,11 +2097,24 @@ function exportAmrCsv() {
 
 // ── Launch Flow: Disclaimer -> Data Source Selection (Path list OR Upload) ──
 function checkNoticeModal() {
+  // Do not show disclaimer/welcome when refreshed in the current session
+  try {
+    if (sessionStorage.getItem('whonet_welcome_seen')) {
+      return;
+    }
+    sessionStorage.setItem('whonet_welcome_seen', '1');
+  } catch (e) {
+    // Graceful fallback if storage is restricted
+  }
+
   // Open disclaimer modal on launch
   document.getElementById('disclaimer-modal').classList.add('open');
 }
 
 function proceedToDataSourceModal() {
+  try {
+    sessionStorage.setItem('whonet_welcome_seen', '1');
+  } catch (e) {}
   document.getElementById('disclaimer-modal').classList.remove('open');
   renderLaunchDbSelect();
   document.getElementById('source-modal').classList.add('open');
@@ -2106,9 +2135,9 @@ function renderLaunchDbSelect() {
       const folderConnected = Boolean(state.dirHandle);
       btnPickFolder.classList.toggle('btn-primary', !folderConnected);
       btnPickFolder.classList.toggle('btn-success', folderConnected);
-      btnPickFolder.textContent = folderConnected
-        ? '✓ Folder Connected'
-        : '📂 Select WHONET Folder (C:\\WHONET\\Data)';
+      btnPickFolder.innerHTML = folderConnected
+        ? '<i class="fa-solid fa-check"></i> Folder Connected'
+        : '<i class="fa-solid fa-folder-open"></i> Select WHONET Folder (C:\\WHONET\\Data)';
       btnPickFolder.title = folderConnected
         ? 'Select a different WHONET data folder'
         : 'Select the WHONET data folder';

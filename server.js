@@ -215,7 +215,13 @@ function handleRequest(req, res) {
     }
   }
 
-  if (path === "/dev-icon.png" || path === "/dev-icon.ico") {
+  if (
+    path === "/dev-icon.png" ||
+    path === "/dev-icon.ico" ||
+    path === "/favicon.ico" ||
+    path === "/favicon.png" ||
+    path === "/apple-touch-icon.png"
+  ) {
     const iconPath = existsSync(join(__dirname, "src", path.slice(1)))
       ? join(__dirname, "src", path.slice(1))
       : join(__dirname, path.slice(1));

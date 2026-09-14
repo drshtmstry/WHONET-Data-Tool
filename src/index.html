@@ -4,7 +4,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WHONET Data Tool — Surveillance &amp; Quality Utility</title>
+  <title>WHONET Data Tool</title>
+
+  <!-- Favicon: WHONET Official Icon -->
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="/apple-touch-icon.png">
 
   <!-- Modern Clinical Fonts: Plus Jakarta Sans & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,6 +17,10 @@
   <link
     href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
     rel="stylesheet">
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.3.1/css/all.min.css"
+    crossorigin="anonymous" referrerpolicy="no-referrer">
 
   <link rel="stylesheet" href="styles.css" />
 
@@ -64,18 +73,18 @@
 
       <button class="btn btn-sm btn-success" id="btn-save-file" onclick="saveToFileHandle()"
         title="Save changes directly back to the original .sqlite file on disk" style="display: none">
-        💾 Save to File
+        <i class="fa-solid fa-floppy-disk"></i> Save to File
       </button>
 
       <button class="btn btn-sm db-action-export" id="btn-download-db" onclick="exportSqliteDatabase()"
         title="Download / Export modified .sqlite file to your computer" style="display: none">
-        ⬇ Export SQLite
+        <i class="fa-solid fa-file-export"></i> Export SQLite
       </button>
 
       <!-- Theme Switcher -->
       <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()"
         title="Toggle Light / Dark Mode" aria-label="Toggle Theme">
-        🌙
+        <i class="fa-solid fa-moon"></i>
       </button>
 
       <input type="file" id="file-upload-input" accept=".sqlite" style="display: none"
@@ -99,7 +108,7 @@
         Dashboard
       </div>
 
-      <div class="nav-section">Surveillance Data</div>
+      <div class="nav-section">View and Analyze Data</div>
       <div class="nav-item" onclick="showPage('isolates')" id="nav-isolates">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
@@ -161,15 +170,10 @@
           (Brigham &amp; Women's Hospital).<br />
         </div>
 
-        <div>
-          <div style="
-                font-size: 10.5px;
-                text-transform: uppercase;
-                letter-spacing: 0.8px;
-                font-weight: 700;
-                color: var(--text4);
-                margin-bottom: 8px;
-              ">
+        <div class="sidebar-separator"></div>
+
+        <div class="sidebar-dev-credit">
+          <div class="sidebar-dev-label">
             Developed by
           </div>
           <a class="dev-pill" href="https://drshtmstry.github.io/" target="_blank" rel="noopener noreferrer"
@@ -192,7 +196,7 @@
             " ondragleave="this.classList.remove('dragover')" ondrop="handleFileDrop(event)"
           onclick="document.getElementById('file-upload-input').click()">
           <div class="db-dropzone-content">
-            <div class="db-dropzone-icon">📥</div>
+            <div class="db-dropzone-icon"><i class="fa-solid fa-inbox"></i></div>
             <div class="db-dropzone-text">
               <div class="db-dropzone-title">
                 Drag &amp; Drop any WHONET <code>.sqlite</code> file here, or click to upload
@@ -204,22 +208,22 @@
           </div>
           <div class="db-source-tabs" onclick="event.stopPropagation()">
             <button class="btn btn-sm btn-primary" onclick="document.getElementById('file-upload-input').click()">
-              ⬆ Choose SQLite File
+              <i class="fa-solid fa-upload"></i> Choose SQLite File
             </button>
             <button class="btn btn-sm btn-ghost" onclick="loadSampleDatabase('WHO-TST-2020-01.sqlite')"
               title="Load bundled sample dataset">
-              🗄️ WHO-TST-2020-01.sqlite
+              <i class="fa-solid fa-database"></i> WHO-TST-2020-01.sqlite
             </button>
             <button class="btn btn-sm btn-ghost" onclick="loadSampleDatabase('WHO-TST-2020-OneHealth.sqlite')"
               title="Load bundled sample dataset">
-              🗄️ WHO-TST-2020-OneHealth.sqlite
+              <i class="fa-solid fa-database"></i> WHO-TST-2020-OneHealth.sqlite
             </button>
           </div>
         </div>
 
         <!-- Section Header -->
         <div class="section-header">
-          <div class="section-title">📊 Overview</div>
+          <div class="section-title"><i class="fa-solid fa-chart-column"></i> Overview</div>
           <div class="section-actions" style="display: flex; align-items: center; gap: 10px;">
             <div id="db-label">No database loaded</div>
             <button type="button" class="btn-icon" onclick="loadStats()" title="Refresh Surveillance Data"
@@ -237,7 +241,7 @@
           <div class="chart-controls-bar">
             <div class="chart-controls-left">
               <div class="chart-card-title">
-                <span>📈 Analytics</span>
+                <span><i class="fa-solid fa-chart-line"></i> Analytics</span>
               </div>
               <div class="chart-card-sub" id="chart-filtered-sub">
                 Visual distribution across selected clinical parameters
@@ -312,7 +316,7 @@
             <div class="chart-box" id="chart-box-bar">
               <div class="chart-box-header">
                 <div class="chart-box-title" id="bar-chart-title">
-                  📊 Frequency
+                  <i class="fa-solid fa-chart-column"></i> Frequency
                 </div>
               </div>
               <div class="chart-canvas-container">
@@ -324,7 +328,7 @@
             <div class="chart-box" id="chart-box-pie">
               <div class="chart-box-header">
                 <div class="chart-box-title" id="pie-chart-title">
-                  🍩 Breakdown (%)
+                  <i class="fa-solid fa-chart-pie"></i> Breakdown (%)
                 </div>
                 <div class="chart-box-actions">
                   <span class="badge" id="pie-total-badge" style="
@@ -346,7 +350,7 @@
       <div class="page" id="page-isolates">
         <div class="section-header">
           <div>
-            <div class="section-title">🔬 All Laboratory Isolates</div>
+            <div class="section-title"><i class="fa-solid fa-microscope"></i> All Laboratory Isolates</div>
             <div class="section-sub" id="isolates-count">Loading isolates…</div>
           </div>
         </div>
@@ -382,7 +386,7 @@
       <div class="page" id="page-duplicates">
         <div class="section-header">
           <div>
-            <div class="section-title">⚠️ Duplicate Isolates</div>
+            <div class="section-title"><i class="fa-solid fa-triangle-exclamation"></i> Duplicate Isolates</div>
             <div class="section-sub" id="dup-count">
               Grouped by Specimen ID (case-insensitive)
             </div>
@@ -467,7 +471,7 @@
                 color: var(--yellow);
                 border-color: var(--yellow-border);
               ">
-            ⚡ UPPER(SPEC_NUM)
+            <i class="fa-solid fa-bolt"></i> UPPER(SPEC_NUM)
           </button>
         </div>
 
@@ -505,7 +509,7 @@
       <div class="page" id="page-fixes">
         <div class="section-header">
           <div>
-            <div class="section-title">🔧 Bulk Data Corrections</div>
+            <div class="section-title"><i class="fa-solid fa-wrench"></i> Bulk Data Corrections</div>
             <div class="section-sub">
               Apply standardized quality fixes across all database records
             </div>
@@ -566,13 +570,13 @@
         <div class="section-header" style="margin-top: 12px">
           <div>
             <div class="section-title" style="font-size: 16px">
-              📋 Fix History (This Session)
+              <i class="fa-solid fa-clipboard-list"></i> Fix History (This Session)
             </div>
           </div>
         </div>
         <div id="fix-history" style="display: flex; flex-direction: column; gap: 10px">
           <div class="empty" style="padding: 28px">
-            <div class="empty-icon" style="font-size: 36px">📝</div>
+            <div class="empty-icon" style="font-size: 36px"><i class="fa-solid fa-clipboard-check"></i></div>
             <div class="empty-title">No fixes applied yet</div>
           </div>
         </div>
@@ -582,7 +586,7 @@
       <div class="page" id="page-sql">
         <div class="section-header">
           <div>
-            <div class="section-title">💻 SQL Query Console</div>
+            <div class="section-title"><i class="fa-solid fa-terminal"></i> SQL Query Console</div>
             <div class="section-sub">
               Execute arbitrary SELECT or UPDATE queries directly on the current database (Ctrl+Enter to run)
             </div>
@@ -643,9 +647,9 @@
       <div class="page" id="page-monthly-amr">
         <div class="section-header">
           <div>
-            <div class="section-title">📊 Monthly AMR Surveillance Matrix</div>
+            <div class="section-title"><i class="fa-solid fa-table-cells"></i> Monthly AMR Data</div>
             <div class="section-sub">
-              Culture &amp; Sensitivity (C&amp;S) Testing Data (State Sentinel Format)
+              Culture &amp; Sensitivity (C&amp;S) Testing Data
             </div>
           </div>
           <div style="
@@ -656,10 +660,10 @@
                 flex-wrap: wrap;
               ">
             <button class="btn btn-primary btn-sm" onclick="exportAmrCsv()">
-              📥 Export All (CSV)
+              <i class="fa-solid fa-file-arrow-down"></i> Export All (CSV)
             </button>
             <button class="btn btn-ghost btn-sm" onclick="copyAmrTableTsv()">
-              📋 Copy Table
+              <i class="fa-solid fa-copy"></i> Copy Table
             </button>
           </div>
         </div>
@@ -767,7 +771,8 @@
                 align-items: center;
                 gap: 8px;
               ">
-            <span>ℹ️</span> Instructions for Sentinel Site Reporting (SAPCAR-Gujarat):
+            <span><i class="fa-solid fa-circle-info" style="color: var(--accent);"></i></span> Positive Sample
+            Definition:
           </div>
           <ul style="
                 padding-left: 20px;
@@ -776,16 +781,8 @@
                 color: var(--text2);
               ">
             <li>
-              <strong>Submission Timeline:</strong> Format is requested to be filled and shared with the State by the
-              <strong>5th of every following month</strong>.
-            </li>
-            <li>
-              <strong>Data Integrity:</strong> No column is to be left blank; enter <code>0</code> only where actual
-              zero.
-            </li>
-            <li>
-              <strong>Positive Sample Definition:</strong> No growth / normal commensals are defined as:
-              <ul style="margin-top: 4px">
+              No growth / normal commensals are defined as:
+              <ul style="margin: 6px 0 8px; padding-left: 24px; list-style-type: circle;">
                 <li>
                   <strong>Blood:</strong> <code>xxx</code> (no growth), <code>xpa</code>, <code>xep</code>,
                   <code>xsg</code>, <code>nor</code> (normal flora), or <code>scn</code> (CoNS/skin contaminant).
@@ -799,7 +796,7 @@
             </li>
             <li>
               <strong>Specimen Grouping:</strong> Blood (<code>bl</code>), Pus (<code>ps</code>), Sputum
-              (<code>sp</code>), Urine (<code>ur</code>), and Others (fluids, aspirates, swabs, tissues).
+              (<code>sp</code>), Urine (<code>ur</code>), and Others (fluids, aspirates, swabs, tissues, etc).
             </li>
           </ul>
         </div>
@@ -814,8 +811,9 @@
   <div class="modal-overlay" id="edit-modal">
     <div class="modal" style="max-width: 680px">
       <div class="modal-header">
-        <div class="modal-title" id="edit-modal-title">✏️ Edit Isolate Record</div>
-        <div class="modal-close" onclick="closeEditModal()">✕</div>
+        <div class="modal-title" id="edit-modal-title"><i class="fa-solid fa-pen-to-square"></i> Edit Isolate Record
+        </div>
+        <div class="modal-close" onclick="closeEditModal()"><i class="fa-solid fa-xmark"></i></div>
       </div>
       <div class="modal-body" style="padding: 22px 24px;">
         <form id="edit-isolate-form" onsubmit="saveEditModal(event)">
@@ -914,7 +912,7 @@
     <div class="modal">
       <div class="modal-header">
         <div class="modal-title" id="modal-title">Isolate Detail</div>
-        <div class="modal-close" onclick="closeModal()">✕</div>
+        <div class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></div>
       </div>
       <div class="modal-body" id="modal-body"></div>
     </div>
@@ -925,7 +923,7 @@
     <div class="modal" style="max-width: 480px">
       <div class="modal-header">
         <div class="modal-title" id="confirm-title">Confirm Action</div>
-        <div class="modal-close" onclick="closeConfirm()">✕</div>
+        <div class="modal-close" onclick="closeConfirm()"><i class="fa-solid fa-xmark"></i></div>
       </div>
       <div class="modal-body">
         <div id="confirm-body"></div>
@@ -975,7 +973,8 @@
               margin-bottom: 16px;
               line-height: 1.6;
             ">
-          🛡️ <strong>Safety, Privacy &amp; Verification:</strong>
+          <i class="fa-solid fa-shield-halved" style="color: var(--accent); margin-right: 4px;"></i> <strong>Safety,
+            Privacy &amp; Verification:</strong>
           <ul style="margin: 8px 0 0 16px; padding: 0">
             <li>
               <strong>Zero Server Upload:</strong> Operates locally inside your browser; no patient or laboratory data
@@ -1027,7 +1026,7 @@
     <div class="modal" style="max-width: 640px">
       <div class="modal-header">
         <div class="modal-title" style="display: flex; align-items: center; gap: 10px">
-          <span>📂</span>
+          <span><i class="fa-solid fa-folder-open" style="color: var(--accent);"></i></span>
           <span>Select WHONET Database to Open</span>
         </div>
       </div>
@@ -1054,7 +1053,8 @@
                   align-items: center;
                   gap: 8px;
                 ">
-              <span>📁</span> Option 1: Select file from WHONET Data Folder
+              <span><i class="fa-solid fa-folder" style="color: var(--accent);"></i></span> Option 1: Select file from
+              WHONET Data Folder
             </div>
             <div id="launch-local-desc" style="
                   font-size: 12.5px;
@@ -1088,7 +1088,7 @@
               style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
               <button type="button" id="btn-pick-folder" class="btn btn-sm btn-primary" onclick="chooseWhonetFolder()"
                 style="padding: 7px 16px; font-size: 12.5px; display: none">
-                📂 Select WHONET Folder (C:\WHONET\Data)
+                <i class="fa-solid fa-folder-open"></i> Select WHONET Folder (C:\WHONET\Data)
               </button>
               <input type="file" id="folder-input-fallback" webkitdirectory directory style="display: none"
                 onchange="handleFolderSelected(this.files)" />
@@ -1113,7 +1113,8 @@
                   justify-content: center;
                   gap: 8px;
                 ">
-              <span>⬆️</span> Option 2: Browse a Specific File
+              <span><i class="fa-solid fa-cloud-arrow-up" style="color: var(--green);"></i></span> Option 2: Browse a
+              Specific File
             </div>
             <div style="
                   font-size: 12.5px;
@@ -1125,7 +1126,7 @@
             </div>
             <button class="btn btn-success btn-sm" onclick="triggerBrowseFile()"
               style="padding: 9px 24px; font-size: 13.5px">
-              📁 Browse &amp; Open .sqlite File
+              <i class="fa-solid fa-folder-open"></i> Browse &amp; Open .sqlite File
             </button>
             <input type="file" id="launch-file-input" accept=".sqlite" style="display: none"
               onchange="handleLaunchFileUpload(this.files[0])" />
@@ -1147,7 +1148,8 @@
                   align-items: center;
                   gap: 8px;
                 ">
-              <span>🧪</span> Option 3: Bundled Sample Data (Online / Demo)
+              <span><i class="fa-solid fa-flask" style="color: var(--purple);"></i></span> Option 3: Bundled Sample Data
+              (Online / Demo)
             </div>
             <div style="
                   font-size: 12.5px;
@@ -1164,7 +1166,7 @@
                     border-color: rgba(139, 92, 246, 0.3);
                     color: var(--purple);
                   ">
-                🗄️ WHO-TST-2020-01.sqlite
+                <i class="fa-solid fa-database"></i> WHO-TST-2020-01.sqlite
               </button>
               <button class="btn btn-ghost btn-sm" onclick="loadSampleFromLaunch('WHO-TST-2020-OneHealth.sqlite')"
                 style="
@@ -1174,7 +1176,7 @@
                     border-color: rgba(139, 92, 246, 0.3);
                     color: var(--purple);
                   ">
-                🗄️ WHO-TST-2020-OneHealth.sqlite
+                <i class="fa-solid fa-database"></i> WHO-TST-2020-OneHealth.sqlite
               </button>
             </div>
           </div>
