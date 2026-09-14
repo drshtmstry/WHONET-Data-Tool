@@ -78,6 +78,10 @@ function withDb(callback) {
   const db = new DatabaseSync(currentDbFullPath);
   try {
     db.exec("PRAGMA busy_timeout = 5000;");
+    db.function("NATURAL_KEY", (str) => {
+      if (str === null || str === undefined) return '';
+      return String(str).toLowerCase().replace(/\d+/g, (m) => m.padStart(12, '0'));
+    });
     return callback(db);
   } finally {
     try {
@@ -159,12 +163,10 @@ function handleRequest(req, res) {
     }
   }
 
-  if (path === "/app.js") {
-    const jsPath = existsSync(join(__dirname, "src", "app.js"))
-      ? join(__dirname, "src", "app.js")
-      : join(__dirname, "app.js");
-    if (existsSync(jsPath)) {
-      const js = readFileSync(jsPath, "utf8");
+  if (path.startsWith("/js/")) {
+    const safePath = join(__dirname, "src", path);
+    if (existsSync(safePath)) {
+      const js = readFileSync(safePath, "utf8");
       res.writeHead(200, {
         "Content-Type": "application/javascript; charset=utf-8",
         "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -172,6 +174,7 @@ function handleRequest(req, res) {
       return res.end(js);
     }
   }
+
 
   if (path === "/organisms.js") {
     const orgPath = existsSync(join(__dirname, "src", "organisms.js"))
@@ -478,6 +481,42 @@ function handleRequest(req, res) {
         searchCond = `AND (${groupCol} LIKE UPPER('%${search}%') OR UPPER(FULL_NAME) LIKE UPPER('%${search}%'))`;
       }
 
+      const ALLOWED_DUP_COLS = {
+        ROW_IDX: 'ROW_IDX',
+        MATCHED: groupCol,
+        OTHER: mode === 'patient' ? 'UPPER(SPEC_NUM)' : 'UPPER(PATIENT_ID)',
+        SPEC_NUM: 'SPEC_NUM',
+        PATIENT_ID: 'PATIENT_ID',
+        FULL_NAME: 'FULL_NAME',
+        SPEC_DATE: 'SPEC_DATE',
+        SPEC_TYPE: 'SPEC_TYPE',
+        ORGANISM: 'ORGANISM',
+        SEX: 'SEX',
+        AGE: 'AGE',
+        WARD: 'WARD'
+      };
+      const rawDupSort = urlObj.searchParams.get("sortCol")?.toUpperCase();
+      const dupSortExpr = ALLOWED_DUP_COLS[rawDupSort] || null;
+      const rawDupDir = (urlObj.searchParams.get("sortDir") || "ASC").toUpperCase();
+      const dupSortDir = rawDupDir === "DESC" ? "DESC" : "ASC";
+
+      let orderClause = `ORDER BY NATURAL_KEY(${groupCol}), row_num`;
+      if (dupSortExpr) {
+        if (rawDupSort === 'MATCHED') {
+          orderClause = `ORDER BY NATURAL_KEY(${groupCol}) ${dupSortDir}, row_num`;
+        } else {
+          const clusterAgg = dupSortDir === 'DESC' ? 'MAX' : 'MIN';
+          const clusterValExpr = `${clusterAgg}(NATURAL_KEY(${dupSortExpr})) OVER (PARTITION BY ${groupCol})`;
+          orderClause = `ORDER BY 
+            CASE WHEN ${clusterValExpr} IS NULL OR ${clusterValExpr} = '' THEN 1 ELSE 0 END,
+            ${clusterValExpr} ${dupSortDir},
+            NATURAL_KEY(${groupCol}),
+            CASE WHEN ${dupSortExpr} IS NULL OR ${dupSortExpr} = '' THEN 1 ELSE 0 END,
+            NATURAL_KEY(${dupSortExpr}) ${dupSortDir},
+            row_num`;
+        }
+      }
+
       withDb((db) => {
         const rows = db
           .prepare(
@@ -492,7 +531,7 @@ function handleRequest(req, res) {
           SELECT ROW_IDX, PATIENT_ID, SPEC_DATE, SPEC_NUM, SPEC_TYPE, ORGANISM, FULL_NAME, SEX, AGE, WARD, DEPARTMENT, row_num, total_duplicates
           FROM RankedIsolates
           WHERE total_duplicates > 1 ${searchCond}
-          ORDER BY ${groupCol}, row_num
+          ${orderClause}
           LIMIT ${pageSize} OFFSET ${offset}
         `,
           )
@@ -535,6 +574,30 @@ function handleRequest(req, res) {
       const ward = (urlObj.searchParams.get("ward") || "").replace(/'/g, "''");
       const offset = (page - 1) * pageSize;
 
+      const ALLOWED_ISOLATE_COLS = {
+        ROW_IDX: 'ROW_IDX',
+        SPEC_NUM: 'SPEC_NUM',
+        SPEC_DATE: 'SPEC_DATE',
+        SPEC_TYPE: 'SPEC_TYPE',
+        ORGANISM: 'ORGANISM',
+        FULL_NAME: 'FULL_NAME',
+        SEX: 'SEX',
+        AGE: 'AGE',
+        WARD: 'WARD',
+        DEPARTMENT: 'DEPARTMENT',
+        ESBL: 'ESBL',
+        CARBAPENEM: 'CARBAPENEM',
+        MRSA: 'MRSA'
+      };
+      const rawSortCol = (urlObj.searchParams.get("sortCol") || "ROW_IDX").toUpperCase();
+      const sortCol = ALLOWED_ISOLATE_COLS[rawSortCol] || "ROW_IDX";
+      const rawSortDir = (urlObj.searchParams.get("sortDir") || "DESC").toUpperCase();
+      const sortDir = rawSortDir === "ASC" ? "ASC" : "DESC";
+
+      const orderClause = sortCol === "ROW_IDX"
+        ? `ORDER BY ROW_IDX ${sortDir}`
+        : `ORDER BY CASE WHEN ${sortCol} IS NULL OR ${sortCol} = '' THEN 1 ELSE 0 END, NATURAL_KEY(${sortCol}) ${sortDir}, ROW_IDX DESC`;
+
       const conditions = [];
       if (search)
         conditions.push(
@@ -551,7 +614,7 @@ function handleRequest(req, res) {
             `
           SELECT ROW_IDX, PATIENT_ID, SPEC_DATE, SPEC_NUM, SPEC_TYPE, ORGANISM, FULL_NAME, SEX, AGE, WARD, DEPARTMENT, ESBL, CARBAPENEM, MRSA
           FROM Isolates ${where}
-          ORDER BY ROW_IDX
+          ${orderClause}
           LIMIT ${pageSize} OFFSET ${offset}
         `,
           )
@@ -560,7 +623,7 @@ function handleRequest(req, res) {
         const totalCount = db
           .prepare(`SELECT COUNT(*) as c FROM Isolates ${where}`)
           .get().c;
-        sendJson(res, { rows, totalCount, page, pageSize });
+        sendJson(res, { rows, totalCount, page, pageSize, sortCol, sortDir });
       });
     } catch (e) {
       sendJson(res, { error: e.message }, 500);
@@ -679,9 +742,9 @@ function handleRequest(req, res) {
           }
         }
 
-        // Calculate totals and sort months in descending order
+        // Calculate totals and sort months in ascending order
         const sortedMonths = Object.keys(monthMap).sort((a, b) =>
-          b.localeCompare(a),
+          a.localeCompare(b),
         );
         const monthlyData = sortedMonths.map((ym) => {
           const m = monthMap[ym];
