@@ -280,6 +280,34 @@ function handleRequest(req, res) {
     }
   }
 
+  if (path === "/api/schema" && req.method === "GET") {
+    if (!currentDbFullPath)
+      return sendJson(res, { error: "No database open" }, 400);
+    try {
+      withDb((db) => {
+        const tables = db
+          .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+          .all()
+          .map((t) => t.name);
+        const columns = {};
+        for (const t of tables) {
+          try {
+            columns[t] = db
+              .prepare(`PRAGMA table_info("${t.replace(/"/g, '""')}")`)
+              .all()
+              .map((c) => c.name);
+          } catch (_) {
+            columns[t] = [];
+          }
+        }
+        sendJson(res, { tables, columns });
+      });
+    } catch (e) {
+      sendJson(res, { error: e.message }, 500);
+    }
+    return;
+  }
+
   if (path === "/api/databases" && req.method === "GET") {
     DB_FILES = getDbFiles(); // refresh from disk
     return sendJson(res, { databases: DB_FILES, current: currentDbFile });

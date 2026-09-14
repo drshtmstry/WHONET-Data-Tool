@@ -302,7 +302,7 @@ body {
   color: var(--text2);
   width: 38px;
   height: 38px;
-  border-radius: var(--radius-sm);
+  border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -561,16 +561,17 @@ body {
 }
 
 .db-dropzone-icon {
-  font-size: 22px;
+  font-size: 28px;
+  color: var(--accent);
   margin-bottom: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--accent-light);
-  width: 46px;
-  height: 46px;
+  width: 58px;
+  height: 58px;
   line-height: 1;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -1022,13 +1023,13 @@ body {
 
 .charts-view-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 24px;
   padding: 24px;
 }
 
 .charts-view-grid.single-bar {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .charts-view-grid.single-bar #chart-box-pie {
@@ -1036,7 +1037,7 @@ body {
 }
 
 .charts-view-grid.single-pie {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .charts-view-grid.single-pie #chart-box-bar {
@@ -1052,6 +1053,9 @@ body {
   flex-direction: column;
   position: relative;
   box-shadow: var(--shadow-card);
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
 }
 
 .chart-box-header {
@@ -1073,9 +1077,16 @@ body {
   flex: 1;
   min-height: 290px;
   max-height: 400px;
+  width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.chart-canvas-container canvas {
+  max-width: 100% !important;
+  max-height: 100% !important;
 }
 
 /* ==========================================================================
@@ -1287,8 +1298,31 @@ select.filter-select:focus {
 
 #isolates-table-body,
 #dup-table-body {
-  overflow-x: auto;
+  flex: 1;
+  min-height: 0;
   width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  position: relative;
+}
+
+#isolates-table-body table,
+#dup-table-body table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+#isolates-table-body thead th,
+#dup-table-body thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 var(--border);
+  white-space: nowrap;
 }
 
 table {
@@ -1650,16 +1684,19 @@ tbody td.mono {
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
 }
 
 .sql-toolbar {
-  padding: 14px 20px;
+  padding: 10px 18px;
   display: flex;
   gap: 12px;
   border-bottom: 1px solid var(--border);
   align-items: center;
   flex-wrap: wrap;
   background: var(--bg3);
+  flex-shrink: 0;
 }
 
 .sql-shortcuts {
@@ -1688,27 +1725,153 @@ tbody td.mono {
   background: var(--accent-light);
 }
 
+.sql-input-container {
+  position: relative;
+  width: 100%;
+  flex-shrink: 0;
+}
+
 textarea.sql-input {
   width: 100%;
-  min-height: 160px;
+  height: 125px;
+  min-height: 80px;
+  max-height: 220px;
   background: var(--bg3);
   border: none;
   outline: none;
   color: var(--text);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 14px;
-  padding: 20px;
+  font-size: 13.5px;
+  padding: 14px 18px;
   resize: vertical;
-  line-height: 1.6;
+  line-height: 1.55;
+  display: block;
+}
+
+.sql-autocomplete-dropdown {
+  position: absolute;
+  z-index: 1000;
+  min-width: 280px;
+  max-width: 420px;
+  max-height: 250px;
+  overflow-y: auto;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+
+.sql-autocomplete-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  color: var(--text);
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.sql-autocomplete-item:hover,
+.sql-autocomplete-item.active {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.sql-autocomplete-word {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sql-autocomplete-word .match-hl {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sql-autocomplete-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.sql-badge-keyword {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+[data-theme="light"] .sql-badge-keyword {
+  background: rgba(139, 92, 246, 0.12);
+  color: #7c3aed;
+  border-color: rgba(139, 92, 246, 0.25);
+}
+
+.sql-badge-column {
+  background: rgba(14, 165, 233, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.3);
+}
+
+[data-theme="light"] .sql-badge-column {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0284c7;
+  border-color: rgba(14, 165, 233, 0.25);
+}
+
+.sql-badge-function {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+[data-theme="light"] .sql-badge-function {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.sql-badge-table {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+[data-theme="light"] .sql-badge-table {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.25);
 }
 
 .sql-result {
-  padding: 18px 20px;
+  padding: 10px 18px;
   border-top: 1px solid var(--border);
-  min-height: 70px;
+  min-height: 42px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
+  font-size: 12.5px;
   background: var(--bg2);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 
 .sql-result.error {
@@ -1719,6 +1882,109 @@ textarea.sql-input {
 .sql-result.success {
   color: var(--green);
   background: var(--green-bg);
+}
+
+.result-table-wrap {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+  scrollbar-width: thin;
+}
+
+.result-table-wrap table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.result-table-wrap th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg3);
+  padding: 10px 16px;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+.result-table-wrap td {
+  padding: 9px 16px;
+  white-space: nowrap;
+  max-width: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+}
+
+/* Containment for Data View Pages (SQL, Isolates, Duplicates)
+   Confines the view to the viewport and enables internal vertical/horizontal table scrolling */
+.main:has(#page-sql.active),
+.main:has(#page-isolates.active),
+.main:has(#page-duplicates.active),
+.main.page-no-scroll {
+  overflow-y: hidden !important;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+#page-sql.active,
+#page-isolates.active,
+#page-duplicates.active {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#page-sql .section-header,
+#page-isolates .section-header,
+#page-duplicates .section-header {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
+#page-duplicates #casing-banner {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
+#page-isolates .table-wrap,
+#page-duplicates .table-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+#page-isolates .table-toolbar,
+#page-duplicates .table-toolbar {
+  flex-shrink: 0;
+}
+
+#page-isolates .pagination,
+#page-duplicates .pagination {
+  flex-shrink: 0;
+  position: static;
+  box-shadow: none;
+  border-top: 1px solid var(--border);
+}
+
+#page-sql .sql-editor-wrap {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 
 /* ==========================================================================

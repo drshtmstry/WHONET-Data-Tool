@@ -196,7 +196,7 @@
             " ondragleave="this.classList.remove('dragover')" ondrop="handleFileDrop(event)"
           onclick="document.getElementById('file-upload-input').click()">
           <div class="db-dropzone-content">
-            <div class="db-dropzone-icon"><i class="fa-solid fa-inbox"></i></div>
+            <div class="db-dropzone-icon"><i class="fa-solid fa-upload"></i></div>
             <div class="db-dropzone-text">
               <div class="db-dropzone-title">
                 Drag &amp; Drop any WHONET <code>.sqlite</code> file here, or click to upload
@@ -606,7 +606,7 @@
             <div class="sql-shortcuts">
               <div class="sql-shortcut" onclick="
                     insertSQL(
-                      'SELECT * FROM Isolates WHERE total_duplicates > 1',
+                      'SELECT * FROM Isolates WHERE UPPER(SPEC_NUM) IN (SELECT UPPER(SPEC_NUM) FROM Isolates GROUP BY UPPER(SPEC_NUM) HAVING COUNT(*) > 1) ORDER BY SPEC_NUM',
                     )
                   ">
                 Duplicates
@@ -634,8 +634,12 @@
               </div>
             </div>
           </div>
-          <textarea class="sql-input" id="sql-input"
-            placeholder="-- Enter your SQL query here (press Ctrl+Enter to execute)&#10;SELECT * FROM Isolates LIMIT 10;"></textarea>
+          <div class="sql-input-container">
+            <textarea class="sql-input" id="sql-input"
+              placeholder="-- Enter your SQL query here (press Ctrl+Enter to execute)&#10;SELECT * FROM Isolates LIMIT 10;"
+              spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+            <div class="sql-autocomplete-dropdown" id="sql-autocomplete-dropdown" style="display: none;"></div>
+          </div>
           <div class="sql-result" id="sql-result">
             <span style="color: var(--text3)">Results will appear here…</span>
           </div>
@@ -771,8 +775,8 @@
                 align-items: center;
                 gap: 8px;
               ">
-            <span><i class="fa-solid fa-circle-info" style="color: var(--accent);"></i></span> Positive Sample
-            Definition:
+            <span><i class="fa-solid fa-circle-info" style="color: var(--accent);"></i></span> Sample
+            Definitions:
           </div>
           <ul style="
                 padding-left: 20px;
@@ -792,11 +796,9 @@
                   <code>xsg</code>, <code>nor</code>, <code>ora</code>, or <code>vag</code>.
                 </li>
               </ul>
-              All other pathogens are identified and counted as positive growth.
             </li>
             <li>
-              <strong>Specimen Grouping:</strong> Blood (<code>bl</code>), Pus (<code>ps</code>), Sputum
-              (<code>sp</code>), Urine (<code>ur</code>), and Others (fluids, aspirates, swabs, tissues, etc).
+              All other pathogens are identified and counted as positive growth.
             </li>
           </ul>
         </div>

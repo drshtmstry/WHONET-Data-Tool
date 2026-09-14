@@ -99,9 +99,6 @@ function updateCurrentFileDisplay(filename) {
           <span>Active dataset:</span>
           <span class="current-file-chip"><i class="fa-solid fa-database"></i> ${escapeHtml(filename)}</span>
         </div>
-        <div class="db-dropzone-hint-row">
-          • Drop any <code>.sqlite</code> file to replace or switch
-        </div>
       `;
     } else {
       dropSub.innerHTML = 'Works directly with standard WHONET files from <code>C:\\WHONET\\Data</code> or custom folders/downloads.';
@@ -360,6 +357,19 @@ function handleWasmApi(path, options = {}) {
       const wards = wasmSelect("SELECT DISTINCT WARD FROM Isolates WHERE WARD IS NOT NULL AND WARD != '' ORDER BY WARD").map(r => r.WARD);
 
       return { total, dupRows, dupGroups, dupPtRows, dupPtGroups, organisms, wards };
+    }
+
+    if (pathname === '/api/schema') {
+      const tables = wasmSelect("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").map(t => t.name);
+      const columns = {};
+      for (const t of tables) {
+        try {
+          columns[t] = wasmSelect(`PRAGMA table_info("${t.replace(/"/g, '""')}")`).map(c => c.name);
+        } catch (_) {
+          columns[t] = [];
+        }
+      }
+      return { tables, columns };
     }
 
     if (pathname === '/api/isolates') {
@@ -755,15 +765,27 @@ function showPage(name) {
   document.getElementById('page-' + name).classList.add('active');
   document.getElementById('nav-' + name).classList.add('active');
 
+  const mainEl = document.querySelector('.main');
+  if (mainEl) {
+    const noScrollPages = ['sql', 'isolates', 'duplicates'];
+    mainEl.classList.toggle('page-no-scroll', noScrollPages.includes(name));
+    mainEl.classList.toggle('page-sql-active', name === 'sql');
+  }
+
   if (name === 'isolates' && state.currentDb) loadIsolates(1);
   if (name === 'duplicates' && state.currentDb) loadDuplicates(1);
   if (name === 'dashboard' && state.currentDb) loadStats();
   if (name === 'monthly-amr' && state.currentDb) loadMonthlyAmrData();
+  if (name === 'sql') {
+    initSqlAutocomplete();
+    refreshSqlSchema();
+  }
 }
 
 // ── Init ──
 async function init() {
   initTheme();
+  initSqlAutocomplete();
   try {
     const data = await fetch(API + '/api/databases').then(r => r.json());
     if (data && Array.isArray(data.databases)) {
@@ -774,6 +796,7 @@ async function init() {
       renderDbSelector();
       if (state.currentDb) {
         await loadStats();
+        refreshSqlSchema();
       }
       return;
     }
@@ -836,6 +859,7 @@ async function switchDb(filename) {
     renderDbSelector();
     toast(`Switched to ${filename} (${data.count.toLocaleString()} records)`, 'success');
     loadStats();
+    refreshSqlSchema();
     return;
   }
 
@@ -849,6 +873,7 @@ async function switchDb(filename) {
   renderDbSelector();
   toast(`Switched to ${filename} (${data.count.toLocaleString()} records)`, 'success');
   loadStats();
+  refreshSqlSchema();
 }
 
 // ── Export / Download .sqlite (for in-browser WASM changes) ──
@@ -908,6 +933,7 @@ async function loadSampleDatabase(sampleFilename) {
     const count = wasmSelect('SELECT COUNT(*) as c FROM Isolates')[0]?.c || 0;
     toast(`Loaded sample ${sampleFilename} (${count.toLocaleString()} records)`, 'success');
     loadStats();
+    refreshSqlSchema();
   } catch (err) {
     toast(`Failed to load sample database: ${err.message}`, 'error');
   }
@@ -937,6 +963,7 @@ async function handleFileUpload(file, fileHandle = null) {
       renderDbSelector();
       toast(`Successfully loaded ${data.filename} (${data.count.toLocaleString()} records)`, 'success');
       loadStats();
+      refreshSqlSchema();
       return;
     } catch (err) {
       console.warn('Local upload failed, falling back to client-side WASM engine:', err.message);
@@ -981,6 +1008,7 @@ async function handleFileUpload(file, fileHandle = null) {
     const count = wasmSelect('SELECT COUNT(*) as c FROM Isolates')[0]?.c || 0;
     toast(`Successfully loaded ${file.name} into browser (${count.toLocaleString()} records)`, 'success');
     loadStats();
+    refreshSqlSchema();
   } catch (err) {
     toast(`Failed to load SQLite file in browser: ${err.message}`, 'error');
   }
@@ -1078,8 +1106,12 @@ function setChartTypeMode(mode) {
     if (btn) btn.classList.toggle('active', m === mode);
   });
 
-  if (barChartInstance) barChartInstance.resize();
-  if (pieChartInstance) pieChartInstance.resize();
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (barChartInstance) barChartInstance.resize();
+      if (pieChartInstance) pieChartInstance.resize();
+    });
+  });
 }
 
 function onPeriodFilterChange() {
@@ -1309,7 +1341,12 @@ async function loadIsolates(page = 1) {
   if (data.error) return toast(data.error, 'error');
 
   document.getElementById('isolates-count').textContent = `${data.totalCount.toLocaleString()} records`;
-  document.getElementById('isolates-table-body').innerHTML = renderIsolatesTable(data.rows);
+  const isoBody = document.getElementById('isolates-table-body');
+  if (isoBody) {
+    isoBody.innerHTML = renderIsolatesTable(data.rows);
+    isoBody.scrollTop = 0;
+    isoBody.scrollLeft = 0;
+  }
   renderPagination('isolates-pagination', page, data.totalCount, 50, loadIsolates);
 }
 
@@ -1408,7 +1445,12 @@ async function loadDuplicates(page = 1) {
   document.getElementById('dup-count').textContent =
     `${data.totalCount.toLocaleString()} duplicate records across ${totalGroups.toLocaleString()} groups (ordered by ${modeLabel})`;
 
-  document.getElementById('dup-table-body').innerHTML = renderDuplicatesTable(data.rows, mode);
+  const dupBody = document.getElementById('dup-table-body');
+  if (dupBody) {
+    dupBody.innerHTML = renderDuplicatesTable(data.rows, mode);
+    dupBody.scrollTop = 0;
+    dupBody.scrollLeft = 0;
+  }
   updateDupSelectedState();
   renderPagination('dup-pagination', page, data.totalCount, 200, loadDuplicates);
 }
@@ -1589,13 +1631,325 @@ async function bulkFix(op) {
   if (op === 'upper_spec_num') loadStats();
 }
 
+// ── SQL Autocomplete & Intelligence Engine ──
+let sqlSchemaCache = {
+  tables: ['Isolates'],
+  columns: {
+    'Isolates': [
+      'ROW_IDX', 'SPEC_NUM', 'PATIENT_ID', 'SPEC_DATE', 'SPEC_TYPE', 'ORGANISM',
+      'FULL_NAME', 'SEX', 'AGE', 'AGE_GROUP', 'WARD', 'WARD_TYPE', 'DEPARTMENT',
+      'INSTITUT', 'DATE_ADMIS', 'DATE_DATA', 'COMMENT', 'ESBL', 'CARBAPENEM', 'MRSA',
+      'URINECOUNT', 'SEROTYPE', 'BETA_LACT', 'INDUC_CLI',
+      'AMP_ND10', 'AMX_ND25', 'AMC_ND30', 'TZP_ND100', 'SAM_ND20', 'CFZ_ND30',
+      'CXM_ND30', 'CRO_ND30', 'CTX_ND30', 'CAZ_ND30', 'FEP_ND30', 'IPM_ND10',
+      'MEM_ND10', 'ETP_ND10', 'CIP_ND5', 'LVX_ND5', 'OFX_ND5', 'GEN_ND10',
+      'AMK_ND30', 'TOB_ND10', 'VAN_ND30', 'TEC_ND30', 'LNZ_ND30', 'DOX_ND30',
+      'TET_ND30', 'TGC_ND15', 'SXT_ND25', 'NIT_ND300', 'FOF_ND200', 'CHL_ND30',
+      'CLI_ND2', 'ERY_ND15'
+    ]
+  }
+};
+
+const SQL_AUTOCOMPLETE_KEYWORDS = [
+  'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT', 'OFFSET',
+  'JOIN', 'LEFT JOIN', 'INNER JOIN', 'RIGHT JOIN', 'CROSS JOIN', 'ON',
+  'UPDATE', 'SET', 'INSERT INTO', 'VALUES', 'DELETE FROM', 'WITH', 'AS', 'DISTINCT',
+  'AND', 'OR', 'NOT', 'IN', 'LIKE', 'GLOB', 'BETWEEN', 'IS NULL', 'IS NOT NULL',
+  'EXISTS', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'UNION', 'UNION ALL',
+  'CREATE TABLE', 'DROP TABLE', 'ALTER TABLE', 'PRAGMA', 'DESC', 'ASC',
+  'NULL', 'TRUE', 'FALSE', 'CAST', 'COLLATE', 'NOCASE'
+];
+
+const SQL_AUTOCOMPLETE_FUNCTIONS = [
+  'COUNT(*)', 'COUNT()', 'SUM()', 'AVG()', 'MIN()', 'MAX()',
+  'UPPER()', 'LOWER()', 'TRIM()', 'LENGTH()', 'SUBSTR()',
+  'COALESCE()', 'IFNULL()', 'NULLIF()', 'ROUND()', 'ABS()',
+  'ROW_NUMBER() OVER ()', 'DATE()', 'STRFTIME()', 'GROUP_CONCAT()'
+];
+
+async function refreshSqlSchema() {
+  try {
+    const data = await api('/api/schema');
+    if (data && data.tables && data.columns) {
+      sqlSchemaCache = data;
+    }
+  } catch (err) {
+    console.info('Could not refresh SQL schema:', err.message);
+  }
+}
+
+let sqlAutocompleteState = {
+  visible: false,
+  selectedIndex: 0,
+  items: [],
+  query: '',
+  startPos: 0,
+  endPos: 0
+};
+
+function getCaretPixelPos(textarea, caretIndex) {
+  const mirror = document.createElement('div');
+  const style = window.getComputedStyle(textarea);
+  const props = [
+    'direction', 'boxSizing', 'width', 'height', 'overflowX', 'overflowY',
+    'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'borderStyle',
+    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+    'fontStyle', 'fontVariant', 'fontWeight', 'fontStretch', 'fontSize',
+    'fontSizeAdjust', 'lineHeight', 'fontFamily', 'textAlign', 'textTransform',
+    'textIndent', 'textDecoration', 'letterSpacing', 'wordSpacing', 'tabSize'
+  ];
+  props.forEach(p => { mirror.style[p] = style[p]; });
+  mirror.style.position = 'absolute';
+  mirror.style.top = '0';
+  mirror.style.left = '-9999px';
+  mirror.style.visibility = 'hidden';
+  mirror.style.whiteSpace = 'pre-wrap';
+  mirror.style.wordWrap = 'break-word';
+
+  const text = textarea.value.substring(0, caretIndex);
+  mirror.textContent = text;
+
+  const span = document.createElement('span');
+  span.textContent = textarea.value.substring(caretIndex, caretIndex + 1) || '.';
+  mirror.appendChild(span);
+
+  document.body.appendChild(mirror);
+  const top = span.offsetTop - textarea.scrollTop;
+  const left = span.offsetLeft - textarea.scrollLeft;
+  document.body.removeChild(mirror);
+
+  return { top, left };
+}
+
+function hideSqlAutocomplete() {
+  const dropdown = document.getElementById('sql-autocomplete-dropdown');
+  if (dropdown) dropdown.style.display = 'none';
+  sqlAutocompleteState.visible = false;
+  sqlAutocompleteState.items = [];
+  sqlAutocompleteState.selectedIndex = 0;
+  sqlAutocompleteState.query = '';
+}
+
+function applySqlSuggestion(item) {
+  const textarea = document.getElementById('sql-input');
+  if (!textarea) return;
+  const val = textarea.value;
+  const before = val.substring(0, sqlAutocompleteState.startPos);
+  const after = val.substring(sqlAutocompleteState.endPos);
+
+  let insertion = item.word;
+  let cursorOffset = insertion.length;
+
+  if (insertion.endsWith('()')) {
+    cursorOffset = insertion.length - 1;
+  } else if (insertion.endsWith(' ()')) {
+    cursorOffset = insertion.length - 2;
+  }
+
+  textarea.value = before + insertion + after;
+  const newPos = sqlAutocompleteState.startPos + cursorOffset;
+  textarea.setSelectionRange(newPos, newPos);
+  textarea.focus();
+  hideSqlAutocomplete();
+}
+
+function renderSqlAutocompleteList() {
+  const dropdown = document.getElementById('sql-autocomplete-dropdown');
+  if (!dropdown || !sqlAutocompleteState.items.length) {
+    hideSqlAutocomplete();
+    return;
+  }
+
+  const query = (sqlAutocompleteState.query || '').toLowerCase();
+  dropdown.innerHTML = sqlAutocompleteState.items.map((item, idx) => {
+    const isSelected = idx === sqlAutocompleteState.selectedIndex;
+    const word = item.word;
+    const matchIdx = word.toLowerCase().indexOf(query);
+    let wordHtml = escapeHtml(word);
+    if (matchIdx !== -1 && query.length > 0) {
+      const pre = escapeHtml(word.substring(0, matchIdx));
+      const match = escapeHtml(word.substring(matchIdx, matchIdx + query.length));
+      const post = escapeHtml(word.substring(matchIdx + query.length));
+      wordHtml = `${pre}<span class="match-hl">${match}</span>${post}`;
+    }
+
+    return `
+      <div class="sql-autocomplete-item ${isSelected ? 'active' : ''}" data-idx="${idx}">
+        <div class="sql-autocomplete-word">${wordHtml}</div>
+        <span class="sql-autocomplete-badge sql-badge-${item.type}">${item.type}</span>
+      </div>
+    `;
+  }).join('');
+
+  const activeItem = dropdown.querySelector('.sql-autocomplete-item.active');
+  if (activeItem) {
+    activeItem.scrollIntoView({ block: 'nearest' });
+  }
+
+  dropdown.style.display = 'flex';
+  sqlAutocompleteState.visible = true;
+
+  dropdown.querySelectorAll('.sql-autocomplete-item').forEach(el => {
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const idx = parseInt(el.getAttribute('data-idx'));
+      if (sqlAutocompleteState.items[idx]) {
+        applySqlSuggestion(sqlAutocompleteState.items[idx]);
+      }
+    });
+  });
+}
+
+function triggerSqlAutocomplete(forced = false) {
+  const textarea = document.getElementById('sql-input');
+  const dropdown = document.getElementById('sql-autocomplete-dropdown');
+  if (!textarea || !dropdown) return;
+
+  const cursor = textarea.selectionStart;
+  const val = textarea.value;
+  const textBefore = val.substring(0, cursor);
+
+  // Extract trailing word token
+  const tokenMatch = textBefore.match(/([a-zA-Z0-9_*]+)$/);
+  const token = tokenMatch ? tokenMatch[1] : '';
+
+  if (!forced && token.length === 0) {
+    hideSqlAutocomplete();
+    return;
+  }
+
+  const q = token.toLowerCase();
+
+  // Aggregate all sources
+  const suggestions = [];
+  const seen = new Set();
+
+  function addItem(word, type, priorityBoost = 0) {
+    const wUpper = word.toUpperCase();
+    if (seen.has(wUpper)) return;
+    seen.add(wUpper);
+
+    const wLower = word.toLowerCase();
+    let score = -1;
+    if (wLower === q) score = 100;
+    else if (wLower.startsWith(q)) score = 80 + priorityBoost - (wLower.length - q.length);
+    else if (wLower.includes(q)) score = 40 + priorityBoost;
+    else if (forced) score = 10 + priorityBoost;
+
+    if (score > 0) {
+      suggestions.push({ word, type, score });
+    }
+  }
+
+  // 1. Column names from active schema (high priority)
+  const allCols = new Set();
+  Object.values(sqlSchemaCache.columns || {}).forEach(cols => cols.forEach(c => allCols.add(c)));
+  allCols.forEach(col => addItem(col, 'column', 5));
+
+  // 2. Table names
+  (sqlSchemaCache.tables || ['Isolates']).forEach(t => addItem(t, 'table', 8));
+
+  // 3. SQL Keywords
+  SQL_AUTOCOMPLETE_KEYWORDS.forEach(kw => addItem(kw, 'keyword', 0));
+
+  // 4. SQL Functions
+  SQL_AUTOCOMPLETE_FUNCTIONS.forEach(fn => addItem(fn, 'function', 2));
+
+  if (!suggestions.length) {
+    hideSqlAutocomplete();
+    return;
+  }
+
+  suggestions.sort((a, b) => b.score - a.score);
+  const topItems = suggestions.slice(0, 10);
+
+  sqlAutocompleteState.items = topItems;
+  sqlAutocompleteState.selectedIndex = 0;
+  sqlAutocompleteState.query = token;
+  sqlAutocompleteState.startPos = cursor - token.length;
+  sqlAutocompleteState.endPos = cursor;
+
+  // Calculate coordinates
+  const caretPos = getCaretPixelPos(textarea, cursor);
+  const container = textarea.parentElement;
+  const containerWidth = container ? container.clientWidth : 600;
+  const dropdownWidth = 300;
+
+  let left = caretPos.left;
+  if (left + dropdownWidth > containerWidth - 20) {
+    left = Math.max(12, containerWidth - dropdownWidth - 20);
+  } else {
+    left = Math.max(12, left);
+  }
+
+  let top = caretPos.top + 28;
+  dropdown.style.left = `${left}px`;
+  dropdown.style.top = `${top}px`;
+
+  renderSqlAutocompleteList();
+}
+
+function initSqlAutocomplete() {
+  const textarea = document.getElementById('sql-input');
+  if (!textarea || textarea.dataset.autocompleteBound) return;
+  textarea.dataset.autocompleteBound = 'true';
+
+  textarea.addEventListener('input', () => {
+    triggerSqlAutocomplete(false);
+  });
+
+  textarea.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.code === 'Space') {
+      e.preventDefault();
+      triggerSqlAutocomplete(true);
+      return;
+    }
+
+    if (!sqlAutocompleteState.visible) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      sqlAutocompleteState.selectedIndex =
+        (sqlAutocompleteState.selectedIndex + 1) % sqlAutocompleteState.items.length;
+      renderSqlAutocompleteList();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      sqlAutocompleteState.selectedIndex =
+        (sqlAutocompleteState.selectedIndex - 1 + sqlAutocompleteState.items.length) %
+        sqlAutocompleteState.items.length;
+      renderSqlAutocompleteList();
+    } else if (e.key === 'Tab' || e.key === 'Enter') {
+      // Don't intercept execution shortcuts like Ctrl+Enter
+      if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        applySqlSuggestion(sqlAutocompleteState.items[sqlAutocompleteState.selectedIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      hideSqlAutocomplete();
+    }
+  });
+
+  textarea.addEventListener('blur', () => {
+    setTimeout(hideSqlAutocomplete, 180);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.sql-input-container')) {
+      hideSqlAutocomplete();
+    }
+  });
+}
+
 // ── SQL Editor ──
 function insertSQL(sql) {
+  hideSqlAutocomplete();
   document.getElementById('sql-input').value = sql;
   document.getElementById('sql-result').innerHTML = '<span style="color:var(--text3)">Results will appear here…</span>';
   document.getElementById('sql-result-table').style.display = 'none';
 }
 function clearSQL() {
+  hideSqlAutocomplete();
   document.getElementById('sql-input').value = '';
   document.getElementById('sql-result').innerHTML = '<span style="color:var(--text3)">Results will appear here…</span>';
   document.getElementById('sql-result-table').style.display = 'none';
@@ -1626,10 +1980,12 @@ async function runSQL() {
     resultEl.textContent = `✓ ${data.count} row${data.count !== 1 ? 's' : ''} returned`;
     if (data.rows.length > 0) {
       tableEl.style.display = 'block';
+      tableEl.scrollLeft = 0;
+      tableEl.scrollTop = 0;
       tableEl.innerHTML = `<table>
-        <thead><tr>${data.columns.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+        <thead><tr>${data.columns.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
         <tbody>${data.rows.slice(0, 500).map(r =>
-        `<tr>${data.columns.map(c => `<td>${r[c] ?? '—'}</td>`).join('')}</tr>`
+        `<tr>${data.columns.map(c => `<td>${escapeHtml(r[c] !== null && r[c] !== undefined ? String(r[c]) : '—')}</td>`).join('')}</tr>`
       ).join('')}</tbody>
       </table>`;
     }
@@ -2114,7 +2470,7 @@ function checkNoticeModal() {
 function proceedToDataSourceModal() {
   try {
     sessionStorage.setItem('whonet_welcome_seen', '1');
-  } catch (e) {}
+  } catch (e) { }
   document.getElementById('disclaimer-modal').classList.remove('open');
   renderLaunchDbSelect();
   document.getElementById('source-modal').classList.add('open');
