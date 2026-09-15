@@ -387,9 +387,10 @@
             </select>
           </div>
           <div id="isolates-table-body">
-            <div class="loading">
-              <div class="spinner"></div>
-              Loading isolates…
+            <div class="empty">
+              <div class="empty-icon"><i class="fa-solid fa-database"></i></div>
+              <div class="empty-title">No database loaded</div>
+              <div class="empty-desc">Please open or upload a WHONET SQLite database to view isolates.</div>
             </div>
           </div>
           <div class="pagination" id="isolates-pagination"></div>
@@ -450,7 +451,6 @@
               border-radius: var(--radius-sm);
               padding: 14px 18px;
               margin-bottom: 18px;
-              display: flex;
               align-items: center;
               gap: 14px;
             ">
@@ -510,9 +510,10 @@
             </button>
           </div>
           <div id="dup-table-body">
-            <div class="loading">
-              <div class="spinner"></div>
-              Loading duplicates…
+            <div class="empty">
+              <div class="empty-icon"><i class="fa-solid fa-database"></i></div>
+              <div class="empty-title">No database loaded</div>
+              <div class="empty-desc">Please open or upload a WHONET SQLite database to inspect duplicate records.</div>
             </div>
           </div>
           <div class="pagination" id="dup-pagination"></div>
@@ -761,9 +762,9 @@
                       padding: 32px;
                       text-align: center;
                       color: var(--text3);
-                      font-weight: 600;
+                      font-weight: 500;
                     ">
-                    Loading AMR data…
+                    No database loaded — please open or select a WHONET database to view surveillance data.
                   </td>
                 </tr>
               </tbody>
@@ -1086,17 +1087,11 @@
                     color: var(--text);
                   ">C:\WHONET\Data</code>
             </div>
-            <div style="display: flex; gap: 10px; align-items: center">
-              <select id="launch-db-select" class="filter-select" style="
-                    flex: 1;
-                    background: var(--bg2);
-                    font-weight: 600;
-                    padding: 9px 14px;
-                  ">
+            <div id="launch-local-file-row" class="launch-select-row">
+              <select id="launch-db-select" class="filter-select launch-db-select">
                 <option value="">Scanning folder…</option>
               </select>
-              <button id="btn-open-launch-file" class="btn btn-primary btn-sm" onclick="selectFromLaunchList()"
-                style="padding: 9px 18px">
+              <button id="btn-open-launch-file" class="btn btn-primary btn-sm launch-open-btn" onclick="selectFromLaunchList()">
                 Open File
               </button>
             </div>

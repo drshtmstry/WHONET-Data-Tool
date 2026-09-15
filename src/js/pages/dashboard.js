@@ -8,6 +8,16 @@ let barChartInstance = null;
 let pieChartInstance = null;
 let currentChartDisplayMode = 'both';
 
+function markDatabaseActivated() {
+  state.datasetVersion += 1;
+}
+
+function refreshActiveDataPage() {
+  if (state.currentPage === 'isolates') window.loadIsolates?.(1);
+  if (state.currentPage === 'duplicates') window.loadDuplicates?.(1);
+  if (state.currentPage === 'monthly-amr') window.loadMonthlyAmrData?.();
+}
+
 const PALETTE_COLORS = [
   '#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#f43f5e',
   '#8b5cf6', '#3b82f6', '#14b8a6', '#ec4899', '#6366f1',
@@ -348,12 +358,14 @@ export async function switchDb(filename) {
     state.activeFileHandle = null;
     state.isModified = false;
     state.currentDb = filename;
+    markDatabaseActivated();
     setRuntimeBadge('Local SQLite Server (Node.js)', true);
     const saveBtn = document.getElementById('btn-save-file');
     if (saveBtn) saveBtn.style.display = 'none';
     renderDbSelector();
     toast(`Switched to ${filename} (${data.count.toLocaleString()} records)`, 'success');
     loadStats();
+    refreshActiveDataPage();
     if (typeof window.refreshSqlSchema === 'function') window.refreshSqlSchema();
     return;
   }
@@ -365,9 +377,11 @@ export async function switchDb(filename) {
   });
   if (data.error) return toast(data.error, 'error');
   state.currentDb = filename;
+  markDatabaseActivated();
   renderDbSelector();
   toast(`Switched to ${filename} (${data.count.toLocaleString()} records)`, 'success');
   loadStats();
+  refreshActiveDataPage();
   if (typeof window.refreshSqlSchema === 'function') window.refreshSqlSchema();
 }
 
@@ -379,10 +393,33 @@ export async function loadSampleDatabase(sampleFilename) {
       return;
     }
 
-    const res = await fetch(`/sample-data/${sampleFilename}`);
-    if (!res.ok) {
-      throw new Error(`Failed to download ${sampleFilename} (${res.status})`);
+    const candidateUrls = [
+      new URL(`../../sample-data/${encodeURIComponent(sampleFilename)}`, import.meta.url).href,
+      `/sample-data/${encodeURIComponent(sampleFilename)}`,
+      `sample-data/${encodeURIComponent(sampleFilename)}`,
+      `/public/sample-data/${encodeURIComponent(sampleFilename)}`,
+      `/src/sample-data/${encodeURIComponent(sampleFilename)}`
+    ];
+
+    let res = null;
+    let lastError = null;
+
+    for (const url of candidateUrls) {
+      try {
+        const attempt = await fetch(url);
+        if (attempt.ok) {
+          res = attempt;
+          break;
+        }
+      } catch (fetchErr) {
+        lastError = fetchErr;
+      }
     }
+
+    if (!res || !res.ok) {
+      throw new Error(`Failed to download ${sampleFilename} (${res ? res.status : (lastError?.message || '404')})`);
+    }
+
     const arrayBuffer = await res.arrayBuffer();
     const uInt8Array = new Uint8Array(arrayBuffer);
     const SQL = await getSqlJs();
@@ -391,6 +428,7 @@ export async function loadSampleDatabase(sampleFilename) {
     state.isWasmMode = true;
     state.wasmDb = db;
     state.currentDb = sampleFilename;
+    markDatabaseActivated();
     if (!state.databases.includes(sampleFilename)) {
       state.databases.push(sampleFilename);
     }
@@ -405,6 +443,7 @@ export async function loadSampleDatabase(sampleFilename) {
     const count = wasmSelect('SELECT COUNT(*) as c FROM Isolates')[0]?.c || 0;
     toast(`Loaded sample ${sampleFilename} (${count.toLocaleString()} records)`, 'success');
     loadStats();
+    refreshActiveDataPage();
     if (typeof window.refreshSqlSchema === 'function') window.refreshSqlSchema();
   } catch (err) {
     toast(`Failed to load sample database: ${err.message}`, 'error');
@@ -430,9 +469,11 @@ export async function handleFileUpload(file, fileHandle = null) {
 
       if (data.databases) state.databases = data.databases;
       state.currentDb = data.filename;
+      markDatabaseActivated();
       renderDbSelector();
       toast(`Successfully loaded ${data.filename} (${data.count.toLocaleString()} records)`, 'success');
       loadStats();
+      refreshActiveDataPage();
       if (typeof window.refreshSqlSchema === 'function') window.refreshSqlSchema();
       return;
     } catch (err) {
@@ -449,6 +490,7 @@ export async function handleFileUpload(file, fileHandle = null) {
     state.isWasmMode = true;
     state.wasmDb = db;
     state.currentDb = file.name;
+    markDatabaseActivated();
     state.activeFileHandle = fileHandle;
     state.fileHandles[file.name] = fileHandle || file;
     state.isModified = false;
@@ -477,6 +519,7 @@ export async function handleFileUpload(file, fileHandle = null) {
     const count = wasmSelect('SELECT COUNT(*) as c FROM Isolates')[0]?.c || 0;
     toast(`Successfully loaded ${file.name} into browser (${count.toLocaleString()} records)`, 'success');
     loadStats();
+    refreshActiveDataPage();
     if (typeof window.refreshSqlSchema === 'function') window.refreshSqlSchema();
   } catch (err) {
     toast(`Failed to load SQLite file in browser: ${err.message}`, 'error');

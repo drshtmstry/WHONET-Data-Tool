@@ -4,10 +4,11 @@
  * for 100% offline and standalone web usage.
  */
 import { state } from '../state/store.js';
-import { wasmSelect, wasmRun } from '../db/wasm.js';
+import { wasmSelect, wasmRun, normaliseSchema } from '../db/wasm.js';
 
 export function handleWasmApi(path, options = {}) {
   try {
+    normaliseSchema();
     const url = new URL(path, 'http://dummy');
     const pathname = url.pathname;
     const body = options.body ? (typeof options.body === 'string' ? JSON.parse(options.body) : options.body) : {};
@@ -103,9 +104,23 @@ export function handleWasmApi(path, options = {}) {
       const countSql = `SELECT COUNT(*) as c FROM Isolates ${whereSql}`;
       const totalCount = wasmSelect(countSql, params)[0]?.c || 0;
 
+      const cols = wasmSelect("PRAGMA table_info(Isolates)").map(c => c.name);
+      const colExpr = (name, fallback = "NULL") => cols.includes(name) ? name : `${fallback} AS ${name}`;
+
       const rowsSql = `
-        SELECT ROW_IDX, SPEC_NUM, SPEC_DATE, SPEC_TYPE, ORGANISM, FULL_NAME, SEX, AGE, WARD, DEPARTMENT,
-               ESBL, CARBAPENEM, MRSA
+        SELECT ROW_IDX,
+               ${colExpr('SPEC_NUM', "''")},
+               ${colExpr('SPEC_DATE', "''")},
+               ${colExpr('SPEC_TYPE', "''")},
+               ${colExpr('ORGANISM', "''")},
+               ${colExpr('FULL_NAME', "''")},
+               ${colExpr('SEX', "''")},
+               ${colExpr('AGE', "''")},
+               ${colExpr('WARD', "''")},
+               ${colExpr('DEPARTMENT', "''")},
+               ${colExpr('ESBL')},
+               ${colExpr('CARBAPENEM')},
+               ${colExpr('MRSA')}
         FROM Isolates
         ${whereSql}
         ${orderClause}
@@ -168,6 +183,9 @@ export function handleWasmApi(path, options = {}) {
         }
       }
 
+      const dupCols = wasmSelect("PRAGMA table_info(Isolates)").map(c => c.name);
+      const dupColExpr = (name, fallback = "NULL") => dupCols.includes(name) ? name : `${fallback} AS ${name}`;
+
       const dupSql = `
         WITH RankedIsolates AS (
           SELECT *,
@@ -176,7 +194,18 @@ export function handleWasmApi(path, options = {}) {
           FROM Isolates
           WHERE ${notEmptyCond}
         )
-        SELECT ROW_IDX, PATIENT_ID, SPEC_DATE, SPEC_NUM, SPEC_TYPE, ORGANISM, FULL_NAME, SEX, AGE, WARD, DEPARTMENT, row_num, total_duplicates
+        SELECT ROW_IDX,
+               ${dupColExpr('PATIENT_ID', "''")},
+               ${dupColExpr('SPEC_DATE', "''")},
+               ${dupColExpr('SPEC_NUM', "''")},
+               ${dupColExpr('SPEC_TYPE', "''")},
+               ${dupColExpr('ORGANISM', "''")},
+               ${dupColExpr('FULL_NAME', "''")},
+               ${dupColExpr('SEX', "''")},
+               ${dupColExpr('AGE', "''")},
+               ${dupColExpr('WARD', "''")},
+               ${dupColExpr('DEPARTMENT', "''")},
+               row_num, total_duplicates
         FROM RankedIsolates
         WHERE total_duplicates > 1 ${searchCond}
         ${orderClause}

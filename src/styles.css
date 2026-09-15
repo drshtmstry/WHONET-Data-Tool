@@ -5,6 +5,7 @@
    ========================================================================== */
 
 :root {
+  color-scheme: light;
   /* Light Theme (Default) */
   --bg: #f4f6fb;
   --bg2: #ffffff;
@@ -71,8 +72,8 @@
   --transition-smooth: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-bounce: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
 [data-theme="dark"] {
+  color-scheme: dark;
   /* Ultra-modern Dark Theme */
   --bg: #0b0f19;
   --bg2: #121826;
@@ -137,10 +138,6 @@
   box-sizing: border-box;
 }
 
-html {
-  color-scheme: light dark;
-}
-
 body {
   font-family:
     "Plus Jakarta Sans",
@@ -161,6 +158,85 @@ body {
   transition:
     background-color var(--transition-smooth),
     color var(--transition-smooth);
+}
+
+code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.9em;
+  background: var(--bg3);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 2px 6px;
+}
+
+/* Custom Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) var(--bg3);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg3);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text4);
+}
+
+/* Form Checkboxes & Controls */
+input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  vertical-align: middle;
+  border-radius: 3px;
+}
+
+/* Launch Modal Row Responsiveness */
+.launch-select-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.launch-db-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.launch-open-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 580px) {
+  .launch-select-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .launch-open-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 /* ==========================================================================
@@ -2586,7 +2662,7 @@ textarea.sql-input {
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--bg3);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -2596,6 +2672,14 @@ textarea.sql-input {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text4);
+}
+
+html {
+  scrollbar-color: var(--border2) var(--bg3);
+}
+
+input[type="checkbox"] {
+  accent-color: var(--accent);
 }
 
 @media (max-width: 1080px) {
@@ -3229,6 +3313,31 @@ textarea.sql-input {
 
   .modal-body {
     padding: 14px 16px 20px;
+  }
+
+  #launch-local-file-row {
+    align-items: stretch !important;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  #launch-local-file-row .filter-select,
+  #launch-local-file-row .btn {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #launch-local-file-row .btn {
+    justify-content: center;
+  }
+
+  #btn-pick-folder {
+    max-width: 100%;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    text-align: center;
   }
 
   .detail-grid {

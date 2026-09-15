@@ -31,7 +31,10 @@ export const AMR_HEADERS = [
 
 export async function loadMonthlyAmrData() {
   if (!state.currentDb) return;
+  const datasetVersion = state.datasetVersion;
+  const databaseName = state.currentDb;
   const data = await api('/api/monthly-amr');
+  if (datasetVersion !== state.datasetVersion || databaseName !== state.currentDb) return;
   if (data.error) return toast(data.error, 'error');
 
   state.monthlyAmrData = data;

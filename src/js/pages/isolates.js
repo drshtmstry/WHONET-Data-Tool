@@ -16,20 +16,30 @@ export function sortIsolates(column) {
 }
 
 export async function loadIsolates(page = 1) {
+  const isoBody = document.getElementById('isolates-table-body');
+  const countEl = document.getElementById('isolates-count');
+  if (!state.currentDb) {
+    if (countEl) countEl.textContent = 'Open a database to view isolates';
+    if (isoBody) isoBody.innerHTML = '<div class="empty"><div class="empty-title">No database loaded</div></div>';
+    return;
+  }
+
   state.isolatesPage = page;
+  const datasetVersion = state.datasetVersion;
+  const databaseName = state.currentDb;
   const search = encodeURIComponent(document.getElementById('isolates-search')?.value || '');
   const org = encodeURIComponent(document.getElementById('isolates-org-filter')?.value || '');
   const ward = encodeURIComponent(document.getElementById('isolates-ward-filter')?.value || '');
   const sortCol = state.isolatesSortCol || 'ROW_IDX';
   const sortDir = state.isolatesSortDir || 'desc';
 
+  if (isoBody) isoBody.innerHTML = '<div class="loading"><div class="spinner"></div>Loading isolates…</div>';
   const data = await api(`/api/isolates?page=${page}&pageSize=25&search=${search}&organism=${org}&ward=${ward}&sortCol=${sortCol}&sortDir=${sortDir}`);
+  if (datasetVersion !== state.datasetVersion || databaseName !== state.currentDb) return;
   if (data.error) return toast(data.error, 'error');
 
-  const countEl = document.getElementById('isolates-count');
   if (countEl) countEl.textContent = `${data.totalCount.toLocaleString()} records`;
 
-  const isoBody = document.getElementById('isolates-table-body');
   if (isoBody) {
     isoBody.innerHTML = renderIsolatesTable(data.rows);
     isoBody.scrollTop = 0;

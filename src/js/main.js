@@ -130,10 +130,55 @@ export function showPage(name) {
     mainEl.classList.toggle('page-sql-active', name === 'sql');
   }
 
-  if (name === 'isolates' && state.currentDb) loadIsolates(1);
-  if (name === 'duplicates' && state.currentDb) loadDuplicates(1);
+  if (name === 'isolates') {
+    if (state.currentDb) loadIsolates(1);
+    else {
+      const isoBody = document.getElementById('isolates-table-body');
+      const countEl = document.getElementById('isolates-count');
+      if (countEl) countEl.textContent = 'Open a database to view isolates';
+      if (isoBody) {
+        isoBody.innerHTML = `
+          <div class="empty">
+            <div class="empty-icon"><i class="fa-solid fa-database"></i></div>
+            <div class="empty-title">No database loaded</div>
+            <div class="empty-desc">Please open or upload a WHONET SQLite database to view isolates.</div>
+          </div>`;
+      }
+    }
+  }
+  if (name === 'duplicates') {
+    if (state.currentDb) loadDuplicates(1);
+    else {
+      const dupBody = document.getElementById('dup-table-body');
+      const countEl = document.getElementById('dup-count');
+      const casingBanner = document.getElementById('casing-banner');
+      if (casingBanner) casingBanner.style.display = 'none';
+      if (countEl) countEl.textContent = 'Open a database to view duplicates';
+      if (dupBody) {
+        dupBody.innerHTML = `
+          <div class="empty">
+            <div class="empty-icon"><i class="fa-solid fa-database"></i></div>
+            <div class="empty-title">No database loaded</div>
+            <div class="empty-desc">Please open or upload a WHONET SQLite database to inspect duplicate records.</div>
+          </div>`;
+      }
+    }
+  }
   if (name === 'dashboard' && state.currentDb) loadStats();
-  if (name === 'monthly-amr' && state.currentDb) loadMonthlyAmrData();
+  if (name === 'monthly-amr') {
+    if (state.currentDb) loadMonthlyAmrData();
+    else {
+      const amrBody = document.getElementById('amr-table-body');
+      if (amrBody) {
+        amrBody.innerHTML = `
+          <tr>
+            <td colspan="26" style="padding: 32px; text-align: center; color: var(--text3); font-weight: 500;">
+              No database loaded — please open or select a WHONET database to view surveillance data.
+            </td>
+          </tr>`;
+      }
+    }
+  }
   if (name === 'sql') {
     initSqlAutocomplete();
     refreshSqlSchema();

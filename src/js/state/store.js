@@ -8,6 +8,9 @@ export const API_BASE = isLocalHost && (window.location.port === '7890' || windo
 
 export const state = {
   currentDb: null,
+  // Incremented whenever a new database becomes active. Async page requests use
+  // this to ignore responses that belong to the previously selected database.
+  datasetVersion: 0,
   databases: [],
   stats: {},
   isolatesPage: 1,

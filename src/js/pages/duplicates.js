@@ -58,7 +58,19 @@ export function groupRows(rows, mode = state.dupMode) {
 }
 
 export async function loadDuplicates(page = 1) {
+  const dupBody = document.getElementById("dup-table-body");
+  const countEl = document.getElementById("dup-count");
+  const casingBanner = document.getElementById("casing-banner");
+  if (!state.currentDb) {
+    if (casingBanner) casingBanner.style.display = "none";
+    if (countEl) countEl.textContent = "Open a database to view duplicates";
+    if (dupBody) dupBody.innerHTML = '<div class="empty"><div class="empty-title">No database loaded</div></div>';
+    return;
+  }
+
   state.dupsPage = page;
+  const datasetVersion = state.datasetVersion;
+  const databaseName = state.currentDb;
   const search = encodeURIComponent(
     document.getElementById("dup-search")?.value || "",
   );
@@ -68,6 +80,9 @@ export async function loadDuplicates(page = 1) {
     : "";
 
   // Check for mixed-case SPEC_NUMs and show/hide warning banner
+  if (casingBanner) casingBanner.style.display = "none";
+  if (dupBody) dupBody.innerHTML = '<div class="loading"><div class="spinner"></div>Loading duplicates…</div>';
+
   const casingCheck = await api("/api/custom-sql", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -75,15 +90,19 @@ export async function loadDuplicates(page = 1) {
       sql: "SELECT COUNT(*) as c FROM Isolates WHERE SPEC_NUM != UPPER(SPEC_NUM) AND SPEC_NUM != ''",
     }),
   });
-  const hasMixedCase = casingCheck.rows?.[0]?.c > 0;
-  const casingBanner = document.getElementById("casing-banner");
+  if (datasetVersion !== state.datasetVersion || databaseName !== state.currentDb || !state.currentDb) {
+    if (casingBanner) casingBanner.style.display = "none";
+    return;
+  }
+  const hasMixedCase = (casingCheck?.rows?.[0]?.c || 0) > 0;
   if (casingBanner) {
-    casingBanner.style.display = hasMixedCase ? "flex" : "none";
+    casingBanner.style.display = (hasMixedCase && state.currentDb) ? "flex" : "none";
   }
 
   const data = await api(
     `/api/duplicates?page=${page}&pageSize=50&search=${search}&mode=${mode}${sortParam}`,
   );
+  if (datasetVersion !== state.datasetVersion || databaseName !== state.currentDb) return;
   if (data.error) return toast(data.error, "error");
 
   const modeLabel = mode === "patient" ? "Patient ID" : "Specimen ID";
@@ -93,12 +112,10 @@ export async function loadDuplicates(page = 1) {
       ? state.stats?.dupPtGroups || groupCount
       : state.stats?.dupGroups || groupCount;
 
-  const countEl = document.getElementById("dup-count");
   if (countEl) {
     countEl.textContent = `${data.totalCount.toLocaleString()} duplicate records across ${totalGroups.toLocaleString()} groups (ordered by ${modeLabel})`;
   }
 
-  const dupBody = document.getElementById("dup-table-body");
   if (dupBody) {
     dupBody.innerHTML = renderDuplicatesTable(data.rows, mode);
     dupBody.scrollTop = 0;

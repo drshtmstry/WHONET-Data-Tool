@@ -47,16 +47,35 @@ if (!process.env.WHONET_NO_WATCH && existsSync(srcDir)) {
   });
 }
 
-// Auto-discover all .sqlite files in the data directory
+// Auto-discover all .sqlite files in the data directory and bundled sample folders
 function getDbFiles() {
+  const found = new Set();
   try {
-    return readdirSync(WHONET_DIR)
-      .filter((f) => f.toLowerCase().endsWith(".sqlite"))
-      .sort();
+    if (existsSync(WHONET_DIR)) {
+      for (const f of readdirSync(WHONET_DIR)) {
+        if (f.toLowerCase().endsWith(".sqlite")) found.add(f);
+      }
+    }
   } catch (e) {
     console.error(`Could not read ${WHONET_DIR}:`, e.message);
-    return [];
   }
+
+  const sampleDirs = [
+    join(__dirname, "public", "sample-data"),
+    join(__dirname, "src", "sample-data"),
+    join(__dirname, "sample-data"),
+  ];
+  for (const dir of sampleDirs) {
+    if (existsSync(dir)) {
+      try {
+        for (const f of readdirSync(dir)) {
+          if (f.toLowerCase().endsWith(".sqlite")) found.add(f);
+        }
+      } catch (_) {}
+    }
+  }
+
+  return Array.from(found).sort();
 }
 
 let DB_FILES = getDbFiles();
@@ -66,10 +85,58 @@ let currentDbFullPath = null;
 
 function setTargetDb(filename, customPath = null) {
   currentDbFile = filename;
-  currentDbFullPath = customPath || join(WHONET_DIR, filename);
+  if (customPath && existsSync(customPath)) {
+    currentDbFullPath = customPath;
+    return;
+  }
+  const defaultPath = join(WHONET_DIR, filename);
+  if (existsSync(defaultPath)) {
+    currentDbFullPath = defaultPath;
+    return;
+  }
+  const sampleCandidates = [
+    join(__dirname, "public", "sample-data", filename),
+    join(__dirname, "src", "sample-data", filename),
+    join(__dirname, "sample-data", filename),
+    join(__dirname, filename),
+  ];
+  for (const cand of sampleCandidates) {
+    if (existsSync(cand)) {
+      currentDbFullPath = cand;
+      return;
+    }
+  }
+  currentDbFullPath = defaultPath;
 }
 
 // Execute query with on-demand connection that closes immediately, freeing the file lock
+function ensureDatabaseSchema(db) {
+  try {
+    const cols = db
+      .prepare("PRAGMA table_info(Isolates)")
+      .all()
+      .map((c) => c.name);
+    if (!cols.includes("FULL_NAME")) {
+      if (cols.includes("FIRST_NAME") && cols.includes("LAST_NAME")) {
+        db.exec(
+          `ALTER TABLE Isolates ADD COLUMN FULL_NAME TEXT GENERATED ALWAYS AS ` +
+            `(TRIM(COALESCE(FIRST_NAME,'') || ' ' || COALESCE(LAST_NAME,''))) VIRTUAL`,
+        );
+      } else if (cols.includes("LAST_NAME")) {
+        db.exec(
+          `ALTER TABLE Isolates ADD COLUMN FULL_NAME TEXT GENERATED ALWAYS AS (COALESCE(LAST_NAME, '')) VIRTUAL`,
+        );
+      } else if (cols.includes("FIRST_NAME")) {
+        db.exec(
+          `ALTER TABLE Isolates ADD COLUMN FULL_NAME TEXT GENERATED ALWAYS AS (COALESCE(FIRST_NAME, '')) VIRTUAL`,
+        );
+      } else {
+        db.exec(`ALTER TABLE Isolates ADD COLUMN FULL_NAME TEXT DEFAULT ''`);
+      }
+    }
+  } catch (_) {}
+}
+
 function withDb(callback) {
   if (!currentDbFullPath) {
     throw new Error("No database selected");
@@ -83,6 +150,7 @@ function withDb(callback) {
         .toLowerCase()
         .replace(/\d+/g, (m) => m.padStart(12, "0"));
     });
+    ensureDatabaseSchema(db);
     return callback(db);
   } finally {
     try {
@@ -429,6 +497,8 @@ function handleApi(req, res) {
       }
 
       withDb((db) => {
+        const cols = db.prepare("PRAGMA table_info(Isolates)").all().map(c => c.name);
+        const colExpr = (name, fallback = "NULL") => cols.includes(name) ? name : `${fallback} AS ${name}`;
         const rows = db
           .prepare(
             `
@@ -439,7 +509,18 @@ function handleApi(req, res) {
             FROM Isolates
             WHERE ${notEmptyCond}
           )
-          SELECT ROW_IDX, PATIENT_ID, SPEC_DATE, SPEC_NUM, SPEC_TYPE, ORGANISM, FULL_NAME, SEX, AGE, WARD, DEPARTMENT, row_num, total_duplicates
+          SELECT ROW_IDX,
+                 ${colExpr("PATIENT_ID", "''")},
+                 ${colExpr("SPEC_DATE", "''")},
+                 ${colExpr("SPEC_NUM", "''")},
+                 ${colExpr("SPEC_TYPE", "''")},
+                 ${colExpr("ORGANISM", "''")},
+                 ${colExpr("FULL_NAME", "''")},
+                 ${colExpr("SEX", "''")},
+                 ${colExpr("AGE", "''")},
+                 ${colExpr("WARD", "''")},
+                 ${colExpr("DEPARTMENT", "''")},
+                 row_num, total_duplicates
           FROM RankedIsolates
           WHERE total_duplicates > 1 ${searchCond}
           ${orderClause}
@@ -525,10 +606,25 @@ function handleApi(req, res) {
         conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
 
       withDb((db) => {
+        const cols = db.prepare("PRAGMA table_info(Isolates)").all().map(c => c.name);
+        const colExpr = (name, fallback = "NULL") => cols.includes(name) ? name : `${fallback} AS ${name}`;
         const rows = db
           .prepare(
             `
-          SELECT ROW_IDX, PATIENT_ID, SPEC_DATE, SPEC_NUM, SPEC_TYPE, ORGANISM, FULL_NAME, SEX, AGE, WARD, DEPARTMENT, ESBL, CARBAPENEM, MRSA
+          SELECT ROW_IDX,
+                 ${colExpr("PATIENT_ID", "''")},
+                 ${colExpr("SPEC_DATE", "''")},
+                 ${colExpr("SPEC_NUM", "''")},
+                 ${colExpr("SPEC_TYPE", "''")},
+                 ${colExpr("ORGANISM", "''")},
+                 ${colExpr("FULL_NAME", "''")},
+                 ${colExpr("SEX", "''")},
+                 ${colExpr("AGE", "''")},
+                 ${colExpr("WARD", "''")},
+                 ${colExpr("DEPARTMENT", "''")},
+                 ${colExpr("ESBL")},
+                 ${colExpr("CARBAPENEM")},
+                 ${colExpr("MRSA")}
           FROM Isolates ${where}
           ${orderClause}
           LIMIT ${pageSize} OFFSET ${offset}

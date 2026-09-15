@@ -58,11 +58,25 @@ export function normaliseSchema() {
   if (!state.wasmDb) return;
   try {
     const cols = wasmSelect("PRAGMA table_info(Isolates)").map(r => r.name);
-    if (!cols.includes('FULL_NAME') && cols.includes('FIRST_NAME')) {
-      state.wasmDb.run(
-        `ALTER TABLE Isolates ADD COLUMN FULL_NAME TEXT GENERATED ALWAYS AS ` +
-        `(TRIM(COALESCE(FIRST_NAME,'') || ' ' || COALESCE(LAST_NAME,''))) VIRTUAL`
-      );
+    if (!cols.includes('FULL_NAME')) {
+      if (cols.includes('FIRST_NAME') && cols.includes('LAST_NAME')) {
+        state.wasmDb.run(
+          `ALTER TABLE Isolates ADD COLUMN FULL_NAME TEXT GENERATED ALWAYS AS ` +
+          `(TRIM(COALESCE(FIRST_NAME,'') || ' ' || COALESCE(LAST_NAME,''))) VIRTUAL`
+        );
+      } else if (cols.includes('LAST_NAME')) {
+        state.wasmDb.run(
+          `ALTER TABLE Isolates ADD COLUMN FULL_NAME TEXT GENERATED ALWAYS AS ` +
+          `(COALESCE(LAST_NAME, '')) VIRTUAL`
+        );
+      } else if (cols.includes('FIRST_NAME')) {
+        state.wasmDb.run(
+          `ALTER TABLE Isolates ADD COLUMN FULL_NAME TEXT GENERATED ALWAYS AS ` +
+          `(COALESCE(FIRST_NAME, '')) VIRTUAL`
+        );
+      } else {
+        state.wasmDb.run(`ALTER TABLE Isolates ADD COLUMN FULL_NAME TEXT DEFAULT ''`);
+      }
     }
   } catch (e) {
     console.warn('normaliseSchema:', e.message);
