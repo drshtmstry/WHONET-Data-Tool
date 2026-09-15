@@ -1,27 +1,35 @@
-import { state } from '../state/store.js';
-import { api } from '../api/client.js';
-import { toast } from '../ui/toast.js';
-import { renderSortHeader, renderPagination } from '../ui/table.js';
-import { fmtDate, debounce } from '../utils/formatters.js';
-import { renderOrgBadge } from '../utils/organisms.js';
+import { state } from "../state/store.js";
+import { api } from "../api/client.js";
+import { toast } from "../ui/toast.js";
+import { renderSortHeader, renderPagination } from "../ui/table.js";
+import { fmtDate, debounce } from "../utils/formatters.js";
+import { renderOrgBadge } from "../utils/organisms.js";
 
 export function setDupMode(mode) {
   if (state.dupMode === mode) return;
   state.dupMode = mode;
-  document.getElementById('mode-btn-spec')?.classList.toggle('active', mode === 'spec');
-  document.getElementById('mode-btn-patient')?.classList.toggle('active', mode === 'patient');
+  document
+    .getElementById("mode-btn-spec")
+    ?.classList.toggle("active", mode === "spec");
+  document
+    .getElementById("mode-btn-patient")
+    ?.classList.toggle("active", mode === "patient");
 
-  const searchInput = document.getElementById('dup-search');
+  const searchInput = document.getElementById("dup-search");
   if (searchInput) {
-    searchInput.placeholder = mode === 'patient'
-      ? 'Search by Patient ID or Name…'
-      : 'Search by Specimen # or Name…';
-    searchInput.value = '';
+    searchInput.placeholder =
+      mode === "patient"
+        ? "Search by Patient ID or Name…"
+        : "Search by Specimen # or Name…";
+    searchInput.value = "";
   }
 
   if (state.stats) {
-    const activeCount = mode === 'patient' ? (state.stats.dupPtRows || 0) : (state.stats.dupRows || 0);
-    const badge = document.getElementById('dup-badge');
+    const activeCount =
+      mode === "patient"
+        ? state.stats.dupPtRows || 0
+        : state.stats.dupRows || 0;
+    const badge = document.getElementById("dup-badge");
     if (badge) badge.textContent = activeCount;
   }
 
@@ -30,10 +38,10 @@ export function setDupMode(mode) {
 
 export function sortDuplicates(column) {
   if (state.dupSortCol === column) {
-    state.dupSortDir = state.dupSortDir === 'asc' ? 'desc' : 'asc';
+    state.dupSortDir = state.dupSortDir === "asc" ? "desc" : "asc";
   } else {
     state.dupSortCol = column;
-    state.dupSortDir = 'asc';
+    state.dupSortDir = "asc";
   }
   loadDuplicates(1);
 }
@@ -41,8 +49,8 @@ export function sortDuplicates(column) {
 export function groupRows(rows, mode = state.dupMode) {
   const groups = {};
   for (const r of rows) {
-    const val = mode === 'patient' ? (r.PATIENT_ID || '') : (r.SPEC_NUM || '');
-    const key = val.trim().toUpperCase() || '(BLANK)';
+    const val = mode === "patient" ? r.PATIENT_ID || "" : r.SPEC_NUM || "";
+    const key = val.trim().toUpperCase() || "(BLANK)";
     if (!groups[key]) groups[key] = [];
     groups[key].push(r);
   }
@@ -51,48 +59,57 @@ export function groupRows(rows, mode = state.dupMode) {
 
 export async function loadDuplicates(page = 1) {
   state.dupsPage = page;
-  const search = encodeURIComponent(document.getElementById('dup-search')?.value || '');
+  const search = encodeURIComponent(
+    document.getElementById("dup-search")?.value || "",
+  );
   const mode = state.dupMode;
-  const sortParam = state.dupSortCol ? `&sortCol=${encodeURIComponent(state.dupSortCol)}&sortDir=${encodeURIComponent(state.dupSortDir)}` : '';
+  const sortParam = state.dupSortCol
+    ? `&sortCol=${encodeURIComponent(state.dupSortCol)}&sortDir=${encodeURIComponent(state.dupSortDir)}`
+    : "";
 
   // Check for mixed-case SPEC_NUMs and show/hide warning banner
-  const casingCheck = await api('/api/custom-sql', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sql: "SELECT COUNT(*) as c FROM Isolates WHERE SPEC_NUM != UPPER(SPEC_NUM) AND SPEC_NUM != ''" })
+  const casingCheck = await api("/api/custom-sql", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sql: "SELECT COUNT(*) as c FROM Isolates WHERE SPEC_NUM != UPPER(SPEC_NUM) AND SPEC_NUM != ''",
+    }),
   });
   const hasMixedCase = casingCheck.rows?.[0]?.c > 0;
-  const casingBanner = document.getElementById('casing-banner');
+  const casingBanner = document.getElementById("casing-banner");
   if (casingBanner) {
-    casingBanner.style.display = hasMixedCase ? 'flex' : 'none';
+    casingBanner.style.display = hasMixedCase ? "flex" : "none";
   }
 
-  const data = await api(`/api/duplicates?page=${page}&pageSize=50&search=${search}&mode=${mode}${sortParam}`);
-  if (data.error) return toast(data.error, 'error');
+  const data = await api(
+    `/api/duplicates?page=${page}&pageSize=50&search=${search}&mode=${mode}${sortParam}`,
+  );
+  if (data.error) return toast(data.error, "error");
 
-  const modeLabel = mode === 'patient' ? 'Patient ID' : 'Specimen ID';
+  const modeLabel = mode === "patient" ? "Patient ID" : "Specimen ID";
   const groupCount = Object.keys(groupRows(data.rows, mode)).length;
-  const totalGroups = mode === 'patient'
-    ? (state.stats?.dupPtGroups || groupCount)
-    : (state.stats?.dupGroups || groupCount);
+  const totalGroups =
+    mode === "patient"
+      ? state.stats?.dupPtGroups || groupCount
+      : state.stats?.dupGroups || groupCount;
 
-  const countEl = document.getElementById('dup-count');
+  const countEl = document.getElementById("dup-count");
   if (countEl) {
     countEl.textContent = `${data.totalCount.toLocaleString()} duplicate records across ${totalGroups.toLocaleString()} groups (ordered by ${modeLabel})`;
   }
 
-  const dupBody = document.getElementById('dup-table-body');
+  const dupBody = document.getElementById("dup-table-body");
   if (dupBody) {
     dupBody.innerHTML = renderDuplicatesTable(data.rows, mode);
     dupBody.scrollTop = 0;
     dupBody.scrollLeft = 0;
   }
   updateDupSelectedState();
-  renderPagination('dup-pagination', page, data.totalCount, 50, loadDuplicates);
+  renderPagination("dup-pagination", page, data.totalCount, 50, loadDuplicates);
 }
 
 export function renderDuplicatesTable(rows, mode = state.dupMode) {
-  const modeLabel = mode === 'patient' ? 'Patient ID' : 'Specimen ID';
+  const modeLabel = mode === "patient" ? "Patient ID" : "Specimen ID";
   if (!rows || !rows.length) {
     return `<div class="empty"><div class="empty-icon" style="color:var(--green)"><i class="fa-solid fa-circle-check"></i></div><div class="empty-title">No duplicates found by ${modeLabel}!</div></div>`;
   }
@@ -101,8 +118,8 @@ export function renderDuplicatesTable(rows, mode = state.dupMode) {
   let clusterIdx = 0;
   const sCol = state.dupSortCol;
   const sDir = state.dupSortDir;
-  const matchedLabel = mode === 'patient' ? 'Patient ID (Matched)' : 'Specimen # (Matched)';
-  const otherLabel = mode === 'patient' ? 'Specimen #' : 'Patient ID';
+  const matchedLabel = mode === "patient" ? "Patient ID" : "Specimen #";
+  const otherLabel = mode === "patient" ? "Specimen #" : "Patient ID";
 
   return `
     <table class="dup-table">
@@ -111,37 +128,41 @@ export function renderDuplicatesTable(rows, mode = state.dupMode) {
           <th class="col-check" style="width: 44px; text-align: center;">
             <input type="checkbox" id="dup-select-all" onchange="toggleSelectAllDups(this.checked)" title="Select all on this page" />
           </th>
-          ${renderSortHeader('Row', 'ROW_IDX', sCol, sDir, 'sortDuplicates', 'style="width: 70px;"')}
-          ${renderSortHeader(matchedLabel, 'MATCHED', sCol, sDir, 'sortDuplicates')}
-          ${renderSortHeader(otherLabel, 'OTHER', sCol, sDir, 'sortDuplicates')}
-          ${renderSortHeader('Patient Name', 'FULL_NAME', sCol, sDir, 'sortDuplicates')}
-          ${renderSortHeader('Date', 'SPEC_DATE', sCol, sDir, 'sortDuplicates')}
-          ${renderSortHeader('Type', 'SPEC_TYPE', sCol, sDir, 'sortDuplicates')}
-          ${renderSortHeader('Organism', 'ORGANISM', sCol, sDir, 'sortDuplicates')}
-          ${renderSortHeader('Sex', 'SEX', sCol, sDir, 'sortDuplicates')}
-          ${renderSortHeader('Age', 'AGE', sCol, sDir, 'sortDuplicates')}
-          ${renderSortHeader('Ward', 'WARD', sCol, sDir, 'sortDuplicates')}
+          ${renderSortHeader("Row", "ROW_IDX", sCol, sDir, "sortDuplicates", 'style="width: 70px;"')}
+          ${renderSortHeader(matchedLabel, "MATCHED", sCol, sDir, "sortDuplicates")}
+          ${renderSortHeader(otherLabel, "OTHER", sCol, sDir, "sortDuplicates")}
+          ${renderSortHeader("Patient Name", "FULL_NAME", sCol, sDir, "sortDuplicates")}
+          ${renderSortHeader("Date", "SPEC_DATE", sCol, sDir, "sortDuplicates")}
+          ${renderSortHeader("Type", "SPEC_TYPE", sCol, sDir, "sortDuplicates")}
+          ${renderSortHeader("Organism", "ORGANISM", sCol, sDir, "sortDuplicates")}
+          ${renderSortHeader("Sex", "SEX", sCol, sDir, "sortDuplicates")}
+          ${renderSortHeader("Age", "AGE", sCol, sDir, "sortDuplicates")}
+          ${renderSortHeader("Ward", "WARD", sCol, sDir, "sortDuplicates")}
           <th style="text-align: right; width: 180px;">Actions</th>
         </tr>
       </thead>
       <tbody>
-        ${rows.map((r, idx) => {
-          const keyVal = mode === 'patient' ? (r.PATIENT_ID || '') : (r.SPEC_NUM || '');
-          const groupKey = keyVal.trim().toUpperCase() || '(BLANK)';
-          const isNewGroup = idx > 0 && groupKey !== lastGroupKey;
-          if (idx === 0 || groupKey !== lastGroupKey) {
-            clusterIdx++;
-            lastGroupKey = groupKey;
-          }
+        ${rows
+          .map((r, idx) => {
+            const keyVal =
+              mode === "patient" ? r.PATIENT_ID || "" : r.SPEC_NUM || "";
+            const groupKey = keyVal.trim().toUpperCase() || "(BLANK)";
+            const isNewGroup = idx > 0 && groupKey !== lastGroupKey;
+            if (idx === 0 || groupKey !== lastGroupKey) {
+              clusterIdx++;
+              lastGroupKey = groupKey;
+            }
 
-          const clusterClass = `dup-cluster-${clusterIdx % 2}`;
-          const startClass = isNewGroup ? 'dup-group-start' : '';
+            const clusterClass = `dup-cluster-${clusterIdx % 2}`;
+            const startClass = isNewGroup ? "dup-group-start" : "";
 
-          const matchedVal = mode === 'patient' ? (r.PATIENT_ID || '—') : (r.SPEC_NUM || '—');
-          const otherVal = mode === 'patient' ? (r.SPEC_NUM || '—') : (r.PATIENT_ID || '—');
-          const safeSpecNum = (r.SPEC_NUM || '').replace(/'/g, "\\'");
+            const matchedVal =
+              mode === "patient" ? r.PATIENT_ID || "—" : r.SPEC_NUM || "—";
+            const otherVal =
+              mode === "patient" ? r.SPEC_NUM || "—" : r.PATIENT_ID || "—";
+            const safeSpecNum = (r.SPEC_NUM || "").replace(/'/g, "\\'");
 
-          return `
+            return `
             <tr class="dup-row ${clusterClass} ${startClass}">
               <td class="col-check" style="text-align: center;">
                 <input type="checkbox" class="dup-row-check" value="${r.ROW_IDX}" onchange="updateDupSelectedState()" />
@@ -149,46 +170,49 @@ export function renderDuplicatesTable(rows, mode = state.dupMode) {
               <td class="mono" style="color:var(--text3);font-size:11.5px">#${r.ROW_IDX}</td>
               <td class="mono" style="font-size:12px;font-weight:700;color:var(--accent)">${matchedVal}</td>
               <td class="mono" style="font-size:12px;color:var(--text2)">${otherVal}</td>
-              <td class="pt-name">${r.FULL_NAME || '—'}</td>
+              <td class="pt-name">${r.FULL_NAME || "—"}</td>
               <td>${fmtDate(r.SPEC_DATE)}</td>
-              <td>${r.SPEC_TYPE || '—'}</td>
+              <td>${r.SPEC_TYPE || "—"}</td>
               <td>${renderOrgBadge(r.ORGANISM)}</td>
-              <td>${r.SEX || '—'}</td>
-              <td>${r.AGE || '—'}</td>
-              <td>${r.WARD || '—'}</td>
+              <td>${r.SEX || "—"}</td>
+              <td>${r.AGE || "—"}</td>
+              <td>${r.WARD || "—"}</td>
               <td style="text-align: right; white-space: nowrap;">
                 <button class="btn btn-ghost btn-xs" onclick="openEditModal(${r.ROW_IDX})" title="Edit / correct this isolate">Edit</button>
                 <button class="btn btn-ghost btn-xs" onclick="viewDetail(${r.ROW_IDX})" title="View isolate details">View</button>
                 <button class="btn btn-danger btn-xs" onclick="confirmDeleteRow(${r.ROW_IDX}, '${safeSpecNum}')" title="Delete this isolate">Del</button>
               </td>
             </tr>`;
-        }).join('')}
+          })
+          .join("")}
       </tbody>
     </table>`;
 }
 
 export function toggleSelectAllDups(checked) {
-  const checkboxes = document.querySelectorAll('.dup-row-check');
-  checkboxes.forEach(cb => { cb.checked = checked; });
+  const checkboxes = document.querySelectorAll(".dup-row-check");
+  checkboxes.forEach((cb) => {
+    cb.checked = checked;
+  });
   updateDupSelectedState();
 }
 
 export function updateDupSelectedState() {
-  const checkboxes = Array.from(document.querySelectorAll('.dup-row-check'));
-  const checked = checkboxes.filter(cb => cb.checked);
+  const checkboxes = Array.from(document.querySelectorAll(".dup-row-check"));
+  const checked = checkboxes.filter((cb) => cb.checked);
   const count = checked.length;
 
-  const countEl = document.getElementById('dup-selected-count');
+  const countEl = document.getElementById("dup-selected-count");
   if (countEl) countEl.textContent = count;
 
-  const btn = document.getElementById('dup-delete-selected-btn');
+  const btn = document.getElementById("dup-delete-selected-btn");
   if (btn) {
     btn.disabled = count === 0;
-    btn.style.opacity = count === 0 ? '0.5' : '1';
-    btn.style.cursor = count === 0 ? 'not-allowed' : 'pointer';
+    btn.style.opacity = count === 0 ? "0.5" : "1";
+    btn.style.cursor = count === 0 ? "not-allowed" : "pointer";
   }
 
-  const selectAll = document.getElementById('dup-select-all');
+  const selectAll = document.getElementById("dup-select-all");
   if (selectAll && checkboxes.length > 0) {
     selectAll.checked = count === checkboxes.length;
     selectAll.indeterminate = count > 0 && count < checkboxes.length;

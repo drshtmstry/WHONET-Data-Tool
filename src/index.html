@@ -10,6 +10,10 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
   <link rel="apple-touch-icon" sizes="192x192" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <!-- Modern Clinical Fonts: Plus Jakarta Sans & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1200,7 +1204,16 @@
   <script src="/organisms.js"></script>
   <script type="module" src="js/main.js"></script>
   <script>
-    // Live reload client for active dev tabs
+    // Register Service Worker for PWA (Vercel / web deployments)
+    if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch((err) => {
+          console.info('SW registration skipped or failed:', err.message);
+        });
+      });
+    }
+
+    // Live reload client for active local dev tabs
     (function () {
       if (
         window.location.hostname === "localhost" ||

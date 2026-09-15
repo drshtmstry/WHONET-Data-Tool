@@ -125,7 +125,7 @@ export async function saveToFileHandle() {
 
     if (saveBtn) {
       saveBtn.disabled = true;
-      saveBtn.textContent = '⏳ Saving…';
+      saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
     }
 
     const binaryArray = state.wasmDb.export();

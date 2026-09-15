@@ -162,7 +162,7 @@ export async function init() {
         state.isWasmMode = false;
         state.databases = data.databases;
         state.currentDb = data.current;
-        setRuntimeBadge('Local Server Connected', true);
+        setRuntimeBadge('Local SQLite Server (Node.js)', true);
         renderDbSelector();
         if (state.currentDb) {
           await loadStats();
@@ -175,9 +175,9 @@ export async function init() {
     }
   }
 
-  // Fallback to in-browser WASM mode
+  // Fallback to in-browser engine mode
   state.isWasmMode = true;
-  setRuntimeBadge('In-Browser Client Mode (WASM)', false);
+  setRuntimeBadge('In-Browser Engine (Client-side)', false);
   const btnOpenPath = document.getElementById('btn-open-path');
   if (btnOpenPath) btnOpenPath.style.display = 'none';
   renderDbSelector();

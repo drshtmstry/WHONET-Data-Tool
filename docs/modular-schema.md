@@ -7,75 +7,89 @@ Comprehensive architectural guide and modular schema reference for developers ma
 ## 1. System Architecture Overview
 
 The WHONET Data Tool utilizes a **hybrid execution model** designed to function in two operational modes with zero code duplication:
-1. **Local Server Mode (Node.js)**: Runs locally with `node server.js` on `http://localhost:7890`. Direct file I/O to `C:\WHONET\Data` via Node's native `DatabaseSync` (`node:sqlite`).
-2. **Web / Offline Client Mode (WASM)**: Runs statically (e.g. on [whonet-tool.vercel.app](https://whonet-tool.vercel.app/)) using `sql.js` (WebAssembly SQLite) in the browser. Uses the **File System Access API** with IndexedDB persistent handles to read and auto-save changes directly to local `.sqlite` files on disk without cloud transmission.
+1. **Local SQLite Server (Node.js)**: Runs locally with `npm start` (`node --watch server.js`) on `http://localhost:7890`. Direct file I/O to `C:\WHONET\Data` via Node's native `DatabaseSync` (`node:sqlite`). Zero security dialogs or browser sandbox restrictions.
+2. **In-Browser Engine (Client-side)**: Runs statically on [whonet-tool.vercel.app](https://whonet-tool.vercel.app/) using `sql.js` in the browser. Supports installation as a desktop/mobile PWA with a zero-cache service worker (`public/sw.js`) for instant deployment rollouts. Uses the **File System Access API** with IndexedDB persistent handles to read and save changes directly to local `.sqlite` files on disk without cloud transmission.
 
 ```
                   ┌────────────────────────────────────────────────────────┐
-                  │                 Browser Client UI                     │
+                  │                 Browser Client / PWA                   │
                   │   (Vanilla JS ES Modules + Native CSS Tokens)          │
                   └───────────┬────────────────────────────────┬───────────┘
                               │                                │
                  [state.isWasmMode === false]     [state.isWasmMode === true]
                               ▼                                ▼
                   ┌──────────────────────┐         ┌───────────────────────┐
-                  │   Node.js Backend    │         │  In-Browser SQLite    │
-                  │   (server.js)        │         │  (sql.js WASM)        │
+                  │ Local SQLite Server  │         │   In-Browser Engine   │
+                  │ (Node.js Backend)    │         │     (Client-side)     │
                   │                      │         │                       │
                   │  - DatabaseSync      │         │  - wasm-emulator.js   │
                   │  - NATURAL_KEY UDF   │         │  - NATURAL_KEY UDF    │
                   │  - Live-Reload SSE   │         │  - File System Access │
-                  └───────────┬──────────┘         └───────────┬───────────┘
-                              │                                │
-                              ▼                                ▼
-                  ┌──────────────────────┐         ┌───────────────────────┐
-                  │ Disk (C:\WHONET\Data)│         │ Disk (Direct Handle)  │
-                  └──────────────────────┘         └───────────────────────┘
+                  └───────────┬──────────┘         │  - Zero-Cache SW PWA  │
+                              │                    └───────────┬───────────┘
+                              ▼                                │
+                  ┌──────────────────────┐                     ▼
+                  │ Disk (C:\WHONET\Data)│         ┌───────────────────────┐
+                  └──────────────────────┘         │ Disk (Direct Handle)  │
+                                                   └───────────────────────┘
 ```
 
 ---
 
-## 2. Frontend Modular Directory Schema (`src/js/`)
+## 2. Directory Schema & File Layout
 
-The frontend is structured in native ES Modules (`<script type="module" src="js/main.js"></script>`). No Webpack, Vite, or bundle build steps are required.
+The codebase separates static public assets, frontend modules, and backend execution:
 
 ```
-src/
-├── index.html                  # HTML5 UI shell & semantic layout
-├── styles.css                  # CSS Variables, dark/light themes, typography
-├── organisms.js                # WHONET organism dictionary mapping
-├── vendor/                     # sql.js WASM runtime & wasm binary
-└── js/
-    ├── main.js                 # Application entry point & backward-compat window bridge
-    │
-    ├── state/
-    │   └── store.js            # Reactive application state, observers & badge updates
-    │
-    ├── api/
-    │   ├── client.js           # Unified hybrid API dispatcher (`api()`)
-    │   └── wasm-emulator.js    # Client-side route emulator for offline WASM execution
-    │
-    ├── db/
-    │   ├── wasm.js             # sql.js loader, schema normalization & export
-    │   └── filesystem.js       # File System Access API, IndexedDB folder persistence
-    │
-    ├── ui/
-    │   ├── table.js            # renderSortHeader(), renderPagination()
-    │   ├── toast.js            # Toast alerts with semantic icons
-    │   └── modal.js            # Detail view, edit form, and confirm dialogs
-    │
-    ├── utils/
-    │   ├── natural-sort.js     # naturalKey() & naturalCompare() algorithms
-    │   ├── formatters.js       # Date formatters, HTML sanitization, debouncing
-    │   └── organisms.js        # Organism badge rendering & full name lookup
-    │
-    └── pages/
-        ├── dashboard.js        # KPI cards & Chart.js dynamic visual analytics
-        ├── isolates.js         # Isolates table, multi-parameter search & sort
-        ├── duplicates.js       # Cluster grouping, duplicate modes & batch delete
-        ├── monthly-amr.js      # Surveillance reporting matrix & CSV/TSV exports
-        ├── sql-workspace.js    # SQL query console & contextual autocomplete
-        └── fixes.js            # Bulk data cleansing operations
+├── public/                     # Static root & PWA assets (copied to /dist on build)
+│   ├── manifest.json           # Web App Manifest for PWA installation
+│   ├── sw.js                   # Zero-cache Service Worker (instant update delivery)
+│   ├── favicon.ico / .png      # WHONET official icons
+│   ├── apple-touch-icon.png    # iOS / Safari mobile icon
+│   └── vendor/                 # sql.js WASM binaries (sql-wasm.js, sql-wasm.wasm)
+│
+├── src/                        # Application source code
+│   ├── index.html              # HTML5 UI shell, navigation & modals
+│   ├── styles.css              # Clinical design system, dark/light themes, mobile layouts
+│   ├── organisms.js            # WHONET organism dictionary mapping
+│   ├── sample-data/            # Bundled WHO sample SQLite databases
+│   └── js/                     # Native ES Module architecture
+│       ├── main.js             # Application entry point & backward-compat window bridge
+│       │
+│       ├── state/
+│       │   └── store.js        # Reactive state, observers & runtime badges
+│       │
+│       ├── api/
+│       │   ├── client.js       # Unified hybrid API dispatcher (`api()`)
+│       │   └── wasm-emulator.js# Client-side route emulator for offline WASM execution
+│       │
+│       ├── db/
+│       │   ├── wasm.js         # sql.js loader, schema normalization & export
+│       │   └── filesystem.js   # File System Access API, IndexedDB folder persistence
+│       │
+│       ├── ui/
+│       │   ├── table.js        # renderSortHeader(), renderPagination()
+│       │   ├── toast.js        # Toast alerts with semantic icons
+│       │   └── modal.js        # Detail view, edit form, and confirm dialogs
+│       │
+│       ├── utils/
+│       │   ├── natural-sort.js # naturalKey() & naturalCompare() algorithms
+│       │   ├── formatters.js   # Date formatters, HTML sanitization, debouncing
+│       │   └── organisms.js    # Organism badge rendering & full name lookup
+│       │
+│       └── pages/
+│           ├── dashboard.js    # KPI cards & Chart.js dynamic visual analytics
+│           ├── isolates.js     # Isolates table, multi-parameter search & sort
+│           ├── duplicates.js   # Cluster grouping, duplicate modes & batch delete
+│           ├── monthly-amr.js  # Surveillance reporting matrix & CSV/TSV exports
+│           ├── sql-workspace.js# SQL query console & contextual autocomplete
+│           └── fixes.js        # Bulk data cleansing operations
+│
+├── server.js                   # Local Node.js server (native node:sqlite & auto-sync)
+├── Start-WHONET.bat            # Windows 1-click launcher for lab machines
+├── vite.config.js              # Vite configuration for production builds (/dist)
+├── vercel.json                 # Vercel deployment routing & static build config
+└── package.json                # Project dependencies & operational scripts
 ```
 
 ---

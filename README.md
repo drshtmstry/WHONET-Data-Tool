@@ -1,7 +1,7 @@
 # WHONET Data Tool
 
 <p>High-performance, open-source utility for inspecting, deduplicating, sorting, and analyzing WHONET SQLite databases.</p>
-<p>🌐 <strong><a href="https://whonet-tool.vercel.app/">whonet-tool.vercel.app</a></strong></p>
+<p><a href="https://whonet-tool.vercel.app/"><strong>whonet-tool.vercel.app</strong></a></p>
 
 ---
 
@@ -17,54 +17,67 @@
 - **In-Place Record Corrections** — Clean, inline field editing and full-record correction modals with immediate database sync.
 - **Bulk Data Cleansing** — One-click uppercase specimen normalization and whitespace sanitation.
 - **Intelligent SQL Console** — Built-in query editor with schema-aware autocomplete, keyboard shortcuts, and instant result table sorting.
-- **Dual Runtime Architecture** — Runs either completely client-side in the browser via WebAssembly (`sql.js`), or locally via Node.js native `DatabaseSync` (`node:sqlite`).
+- **Dual Runtime Architecture** — Runs either completely client-side in the browser via the In-Browser Engine (`sql.js`), or locally via Node.js native `DatabaseSync` (`node:sqlite`).
 
 ---
 
 ## Usage
 
-### Web App (Client-Side WASM Mode)
-Open **[whonet-tool.vercel.app](https://whonet-tool.vercel.app/)** in Chrome or Edge:
-- **File System Access**: Grant folder access once (`C:\WHONET\Data`) → the browser remembers the handle via IndexedDB and auto-saves changes directly to disk.
-- **Bundled Samples**: Test immediately with preloaded WHO sample databases (`WHO-TST-2020-01.sqlite`, etc.).
-- **100% Private**: Database engine runs entirely in browser memory; zero network data transfer.
+### Web / PWA App (In-Browser Engine (Client-side))
+Open **[whonet-tool.vercel.app](https://whonet-tool.vercel.app/)** in Chrome or Edge (or click the browser address bar icon to install as a desktop/mobile app):
+- **Direct Folder Access**: Connect your local data folder once (`C:\WHONET\Data`) → the browser remembers the link and saves changes straight to disk.
+- **Preloaded Sample Data**: Test immediately with bundled sample databases (`WHO-TST-2020-01.sqlite`, etc.).
+- **100% Private On-Device Processing**: The database engine runs directly inside your browser; zero patient data is uploaded to any cloud server.
 
-### Local Server Mode
+### Local SQLite Server (Node.js) Mode
 1. Install [Node.js LTS](https://nodejs.org/) (v22+ recommended)
 2. Run `Start-WHONET.bat` or use the command line:
    ```bash
-   npm start       # start server on http://localhost:7890
-   npm run dev     # start with auto-restart on file changes
+   npm start              # run local Node server on http://localhost:7890 (with auto-restart)
    ```
 3. Browser automatically opens at `http://localhost:7890`.
 4. Reads `.sqlite` files directly from `C:\WHONET\Data`. Mutations save straight to disk with on-demand connection locking.
+
+### Web / PWA Mode (Vercel)
+For client-side Vite testing and building:
+```bash
+npm run web:dev        # launch in-browser WASM dev server
+npm run web:build      # compile production bundle for Vercel (/dist)
+npm run web:preview    # preview production build locally
+```
 
 ---
 
 ## Project Structure & Modular Schema
 
-The frontend is built using standard native ES Modules without requiring Webpack or build bundlers:
+The codebase is organized into a dual-runtime architecture supporting both local desktop execution and cloud-deployed PWA builds:
 
 ```
 ├── docs/
 │   └── modular-schema.md   # Architectural specification & schema guide
-├── src/
+├── public/                 # Static assets & PWA files
+│   ├── manifest.json       # Web App Manifest for PWA installation
+│   ├── sw.js               # Zero-cache Service Worker for instant updates
+│   ├── favicon.ico / .png  # Official WHONET icons & touch assets
+│   └── vendor/             # sql.js WebAssembly engine & binaries
+├── src/                    # Application source code
 │   ├── index.html          # Application UI layout & modals
-│   ├── styles.css          # Design system, themes & typography
+│   ├── styles.css          # Design system, themes & responsive layouts
 │   ├── organisms.js        # WHONET organism dictionary
-│   ├── vendor/             # sql.js WebAssembly engine
-│   ├── sample-data/        # Bundled sample SQLite files
-│   └── js/
+│   ├── sample-data/        # Bundled sample SQLite databases
+│   └── js/                 # Modular ES Module architecture
 │       ├── main.js         # ES Module entry point & global event bridge
 │       ├── state/store.js  # Reactive application state
-│       ├── api/            # Hybrid API dispatcher & WASM emulator
+│       ├── api/            # Local Node REST dispatcher & live-reload client
 │       ├── db/             # WebAssembly database & File System Access API
-│       ├── ui/             # Table sorting, modals, and toasts
+│       ├── ui/             # Table rendering, modals, and toasts
 │       ├── utils/          # Natural sort, formatters, and organism badges
 │       └── pages/          # Dashboard, Isolates, Duplicates, AMR, SQL, Fixes
-├── server.js               # Node.js backend (native sqlite & static server)
-├── Start-WHONET.bat        # Windows one-click launcher
-└── vercel.json             # Static web deployment routing
+├── server.js               # Local Node.js server (native node:sqlite & auto-sync)
+├── Start-WHONET.bat        # Windows 1-click launcher for lab machines
+├── vite.config.js          # Vite configuration for production builds
+├── vercel.json             # Vercel deployment routing & static build config
+└── package.json            # Project dependencies & operational scripts
 ```
 
 For complete technical specifications, module contracts, and database table diagrams, refer to **[docs/modular-schema.md](docs/modular-schema.md)**.

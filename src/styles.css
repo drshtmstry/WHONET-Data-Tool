@@ -2614,35 +2614,47 @@ textarea.sql-input {
 }
 
 @media (max-width: 760px) {
+  html, body {
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+  }
+
   .header {
     height: auto;
-    min-height: 60px;
-    padding: 10px 14px;
-    gap: 10px;
+    min-height: 56px;
+    padding: 8px 12px;
+    gap: 8px 10px;
     flex-wrap: wrap;
+    max-width: 100vw;
+    box-sizing: border-box;
   }
 
   .header-logo {
-    flex: 1;
-    gap: 9px;
+    flex: 1 1 auto;
+    gap: 8px;
     min-width: 0;
   }
 
   .header-title-group {
     min-width: 0;
+    flex: 1;
   }
 
   .header-logo img {
-    height: 34px;
+    height: 30px;
   }
 
   .header-title {
-    font-size: 14px;
-    letter-spacing: 0;
+    font-size: 13.5px;
+    letter-spacing: -0.2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .header-sub {
-    font-size: 10px;
+    font-size: 9.5px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2652,29 +2664,39 @@ textarea.sql-input {
     width: 100%;
     margin-left: 0;
     order: 3;
-    gap: 8px;
+    gap: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
   }
 
   .connection-badge {
-    flex-shrink: 0;
-    padding-inline: 9px;
-    font-size: 10.5px;
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    font-size: 10px;
+    white-space: nowrap;
   }
 
   .db-select-wrapper {
-    flex: 1;
+    flex: 1 1 140px;
     min-width: 0;
   }
 
   .db-select {
     width: 100%;
     min-width: 0;
-    max-width: none;
-    font-size: 12px;
+    max-width: 100%;
+    font-size: 11.5px;
+    height: 32px;
+    box-sizing: border-box;
   }
 
   .db-selector .btn {
-    flex: 1 1 145px;
+    flex: 1 1 calc(50% - 4px);
+    font-size: 11.5px;
+    padding: 6px 8px;
+    white-space: nowrap;
+    box-sizing: border-box;
   }
 
   .theme-toggle-btn {
@@ -2683,8 +2705,11 @@ textarea.sql-input {
 
   .layout {
     height: auto;
-    min-height: calc(100vh - 60px);
+    min-height: calc(100vh - 56px);
     display: block;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 
   .sidebar {
@@ -2693,7 +2718,7 @@ textarea.sql-input {
     z-index: 220;
     width: min(86vw, 300px);
     height: 100dvh;
-    padding: 72px 16px 24px;
+    padding: 68px 16px 24px;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -2706,6 +2731,7 @@ textarea.sql-input {
       transform var(--transition-smooth),
       box-shadow var(--transition-smooth);
     box-shadow: none;
+    box-sizing: border-box;
   }
 
   .sidebar.open {
@@ -2718,9 +2744,9 @@ textarea.sql-input {
     align-items: center;
     justify-content: center;
     order: -1;
-    width: 36px;
-    height: 36px;
-    flex: 0 0 36px;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--bg3);
@@ -2733,8 +2759,8 @@ textarea.sql-input {
     align-items: center;
     justify-content: center;
     position: absolute;
-    top: 18px;
-    right: 16px;
+    top: 16px;
+    right: 14px;
     width: 34px;
     height: 34px;
     border: 1px solid var(--border);
@@ -2788,10 +2814,14 @@ textarea.sql-input {
 
   .main {
     min-width: 0;
+    width: 100%;
+    max-width: 100vw;
     height: auto;
-    min-height: calc(100vh - 116px);
+    min-height: calc(100vh - 100px);
     overflow-y: visible;
-    padding: 20px 14px 28px;
+    overflow-x: hidden;
+    padding: 14px 10px 24px;
+    box-sizing: border-box;
   }
 
   .main:has(#page-sql.active),
@@ -2799,63 +2829,119 @@ textarea.sql-input {
   .main:has(#page-duplicates.active),
   .main.page-no-scroll {
     height: auto;
-    min-height: calc(100vh - 170px);
+    min-height: calc(100vh - 140px);
     overflow-y: visible !important;
+    overflow-x: hidden !important;
   }
 
   .db-dropzone {
-    padding: 16px;
-    margin-bottom: 20px;
+    padding: 14px;
+    margin-bottom: 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .db-dropzone-content {
     align-items: flex-start;
-    gap: 12px;
+    gap: 10px;
+    max-width: 100%;
+    min-width: 0;
   }
 
   .db-dropzone-icon {
-    width: 44px;
-    height: 44px;
-    font-size: 20px;
+    width: 38px;
+    height: 38px;
+    font-size: 17px;
+    flex-shrink: 0;
+  }
+
+  .db-dropzone-text {
+    min-width: 0;
+    flex: 1;
   }
 
   .db-dropzone-title {
-    font-size: 13px;
+    font-size: 12.5px;
     white-space: normal;
+    word-break: break-word;
   }
 
   .db-dropzone-sub {
-    font-size: 11px;
+    font-size: 10.5px;
+    max-width: 100%;
+  }
+
+  .db-dropzone-dataset-row,
+  .db-dropzone-hint-row {
+    white-space: normal;
+    flex-wrap: wrap;
+    word-break: break-word;
+  }
+
+  .db-source-tabs {
+    min-width: 0;
+    width: 100%;
+    gap: 6px;
+  }
+
+  .db-source-tabs .btn {
+    width: 100%;
+    white-space: normal;
+    text-align: center;
+    justify-content: center;
+    font-size: 11.5px;
+    padding: 7px 10px;
   }
 
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    margin-bottom: 24px;
+    gap: 8px;
+    margin-bottom: 18px;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .stat-card {
-    padding: 16px;
+    padding: 12px 10px;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   .stat-card-header {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
 
   .stat-icon-wrapper {
-    width: 36px;
-    height: 36px;
-    font-size: 16px;
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
   }
 
   .stat-value {
-    font-size: 28px;
+    font-size: 22px;
+    word-break: break-word;
+  }
+
+  .stat-label {
+    font-size: 10.5px;
   }
 
   .section-header {
     align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-direction: column;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .section-actions {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
   }
 
   #page-duplicates .section-header > div:last-child,
@@ -2863,33 +2949,42 @@ textarea.sql-input {
     width: 100%;
     margin-left: 0 !important;
     justify-content: flex-start;
+    flex-direction: column;
+    gap: 8px;
   }
 
   #page-duplicates .seg-control {
     width: 100%;
+    display: flex;
   }
 
   #page-duplicates .seg-btn {
     flex: 1;
     justify-content: center;
-    padding-inline: 8px;
+    padding: 7px 6px;
+    font-size: 11px;
+    text-align: center;
   }
 
   #page-duplicates #dup-delete-selected-btn {
     width: 100%;
+    justify-content: center;
+    font-size: 12px;
   }
 
   #page-monthly-amr .section-header > div:last-child .btn {
-    flex: 1;
+    width: 100%;
+    flex: 1 1 100%;
+    justify-content: center;
   }
 
   .section-title {
-    font-size: 18px;
+    font-size: 16px;
     letter-spacing: 0;
   }
 
   .section-sub {
-    font-size: 12px;
+    font-size: 11.5px;
   }
 
   .current-file-pill {
@@ -2902,9 +2997,26 @@ textarea.sql-input {
     text-overflow: ellipsis;
   }
 
+  .chart-analytics-card {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
   .chart-controls-bar,
   .charts-view-grid {
-    padding: 16px;
+    padding: 12px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .chart-controls-bar {
+    gap: 12px;
+  }
+
+  .chart-controls-left {
+    min-width: 0;
+    width: 100%;
   }
 
   .chart-controls-right,
@@ -2913,152 +3025,289 @@ textarea.sql-input {
   .chart-date-input,
   .chart-type-toggle {
     width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .chart-filter-select,
+  .chart-date-input {
+    max-width: 100%;
   }
 
   .chart-type-toggle {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .btn-toggle-type {
     justify-content: center;
+    padding: 0 4px;
+    font-size: 11.5px;
+    white-space: nowrap;
   }
 
   .chart-box {
-    padding: 16px;
+    padding: 12px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .chart-canvas-container {
-    min-height: 220px;
+    min-height: 200px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .fix-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .fix-card {
+    padding: 14px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .fix-sql {
+    word-break: break-all;
+    font-size: 11px;
+    padding: 6px 8px;
   }
 
   .table-wrap {
-    border-radius: var(--radius);
+    border-radius: var(--radius-sm);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
 
   .table-toolbar {
-    padding: 10px;
+    padding: 8px 10px;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .search-box {
-    min-width: 100%;
+    min-width: 0;
+    width: 100%;
+    flex: 1 1 100%;
+    box-sizing: border-box;
   }
 
   .table-toolbar > .btn,
   .table-toolbar > select,
   .table-toolbar > .filter-select {
-    flex: 1 1 140px;
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    font-size: 11.5px;
+  }
+
+  #isolates-table-body,
+  #dup-table-body,
+  .amr-table-scroll,
+  .result-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #page-sql .sql-editor-wrap {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   #page-sql .sql-toolbar {
-    padding: 10px;
-    gap: 8px;
+    padding: 8px 10px;
+    gap: 6px;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   #page-sql .sql-toolbar > .btn {
-    flex: 1;
+    flex: 1 1 calc(50% - 4px);
+    box-sizing: border-box;
+    font-size: 11.5px;
   }
 
   #page-sql .sql-shortcuts {
     width: 100%;
     margin-left: 0;
+    gap: 4px;
+  }
+
+  #page-sql .sql-shortcut {
+    flex: 1 1 calc(50% - 4px);
+    text-align: center;
+    padding: 5px 6px;
+    font-size: 10.5px;
+  }
+
+  textarea.sql-input {
+    font-size: 12px;
+    padding: 10px 12px;
+    box-sizing: border-box;
   }
 
   .pagination {
-    padding-inline: 10px;
+    padding: 8px 10px;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     justify-content: flex-start;
+    gap: 6px;
+    width: 100%;
+    box-sizing: border-box;
+    max-width: 100%;
   }
 
   .page-info {
     min-width: max-content;
+    font-size: 11px;
   }
 
   #page-sql .sql-editor-wrap,
   #page-isolates .table-wrap,
   #page-duplicates .table-wrap {
     min-width: 0;
+    width: 100%;
   }
 
   #page-sql.active,
   #page-isolates.active,
   #page-duplicates.active {
     height: auto;
-    min-height: calc(100vh - 170px);
+    min-height: calc(100vh - 140px);
     overflow: visible;
+  }
+
+  #toast-container {
+    left: 12px;
+    right: 12px;
+    bottom: 16px;
+    max-width: calc(100vw - 24px);
+  }
+
+  .toast {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 12px;
+    padding: 10px 14px;
   }
 
   .modal-overlay {
     align-items: flex-end;
-    padding: 10px;
+    padding: 0;
   }
 
   .modal {
-    max-height: calc(100dvh - 20px);
+    max-height: 92dvh;
     border-radius: var(--radius) var(--radius) 0 0;
+    width: 100%;
+    max-width: 100vw;
+    box-sizing: border-box;
   }
 
   .modal-header {
-    padding: 16px 18px;
+    padding: 14px 16px;
   }
 
   .modal-title {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .modal-body {
-    padding: 18px;
+    padding: 14px 16px 20px;
   }
 
   .detail-grid {
     grid-template-columns: 1fr;
+    gap: 10px;
   }
 }
 
 @media (max-width: 380px) {
   .header {
-    padding-inline: 10px;
+    padding: 8px;
   }
 
   .header-logo {
     max-width: none;
+    gap: 6px;
+  }
+
+  .header-logo img {
+    height: 26px;
   }
 
   .header-title {
-    font-size: 13px;
+    font-size: 12px;
+  }
+
+  .header-sub {
+    display: none;
   }
 
   .db-selector {
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
   }
 
   .connection-badge {
-    flex: 1 1 auto;
+    width: 100%;
+    justify-content: center;
   }
 
   .db-select-wrapper {
-    flex: 1 1 150px;
-  }
-
-  .theme-toggle-btn {
-    width: 34px;
-    height: 34px;
+    width: 100%;
+    flex: 1 1 100%;
   }
 
   .db-selector .btn {
-    flex-basis: 100%;
+    width: 100%;
+    flex: 1 1 100%;
   }
 
   .main {
-    padding-inline: 10px;
+    padding: 10px 6px 18px;
   }
 
   .stats-grid {
     grid-template-columns: 1fr;
+    gap: 6px;
   }
 
   .stat-card {
-    padding: 14px;
+    padding: 10px;
+  }
+
+  .table-toolbar > .btn,
+  .table-toolbar > select,
+  .table-toolbar > .filter-select {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  #page-sql .sql-toolbar > .btn {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  #page-sql .sql-shortcut {
+    flex: 1 1 100%;
+    width: 100%;
   }
 
   .modal-overlay {
@@ -3067,5 +3316,6 @@ textarea.sql-input {
 
   .modal {
     max-height: 100dvh;
+    border-radius: 0;
   }
 }

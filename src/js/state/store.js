@@ -50,8 +50,11 @@ export function notify(event, payload) {
 export function setRuntimeBadge(text, isServer = false) {
   const badge = document.getElementById('runtime-badge');
   if (!badge) return;
-  const dotClass = isServer ? 'connection-dot' : 'connection-dot wasm';
-  badge.innerHTML = `<span class="${dotClass}"></span> <span>${text}</span>`;
+  const iconHtml = isServer
+    ? '<i class="fa-solid fa-server" aria-hidden="true"></i>'
+    : '<i class="fa-solid fa-globe" aria-hidden="true"></i>';
+  const cleanText = text.replace(/^[^\w\s]+/, '').trim();
+  badge.innerHTML = `${iconHtml} <span>${cleanText}</span>`;
   badge.style.background = isServer ? 'var(--green-bg)' : 'var(--accent-light)';
   badge.style.color = isServer ? 'var(--green)' : 'var(--accent)';
   badge.style.borderColor = isServer ? 'var(--green-border)' : 'var(--accent-glow)';

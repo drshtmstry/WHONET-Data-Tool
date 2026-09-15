@@ -348,7 +348,7 @@ export async function switchDb(filename) {
     state.activeFileHandle = null;
     state.isModified = false;
     state.currentDb = filename;
-    setRuntimeBadge('Local Server Connected', true);
+    setRuntimeBadge('Local SQLite Server (Node.js)', true);
     const saveBtn = document.getElementById('btn-save-file');
     if (saveBtn) saveBtn.style.display = 'none';
     renderDbSelector();
@@ -395,7 +395,7 @@ export async function loadSampleDatabase(sampleFilename) {
       state.databases.push(sampleFilename);
     }
 
-    setRuntimeBadge('In-Browser WASM Mode', false);
+    setRuntimeBadge('In-Browser Engine (Client-side)', false);
 
     const dlBtn = document.getElementById('btn-download-db');
     if (dlBtn) dlBtn.style.display = 'inline-flex';
@@ -457,7 +457,7 @@ export async function handleFileUpload(file, fileHandle = null) {
       state.databases.push(file.name);
     }
 
-    setRuntimeBadge('In-Browser WASM Mode', false);
+    setRuntimeBadge('In-Browser Engine (Client-side)', false);
 
     const saveBtn = document.getElementById('btn-save-file');
     if (saveBtn) {
