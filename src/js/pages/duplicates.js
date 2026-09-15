@@ -142,20 +142,20 @@ export function renderDuplicatesTable(rows, mode = state.dupMode) {
     <table class="dup-table">
       <thead>
         <tr>
-          <th class="col-check" style="width: 44px; text-align: center;">
+          <th class="col-check" style="text-align: center;">
             <input type="checkbox" id="dup-select-all" onchange="toggleSelectAllDups(this.checked)" title="Select all on this page" />
           </th>
-          ${renderSortHeader("Row", "ROW_IDX", sCol, sDir, "sortDuplicates", 'style="width: 70px;"')}
-          ${renderSortHeader(matchedLabel, "MATCHED", sCol, sDir, "sortDuplicates")}
-          ${renderSortHeader(otherLabel, "OTHER", sCol, sDir, "sortDuplicates")}
-          ${renderSortHeader("Patient Name", "FULL_NAME", sCol, sDir, "sortDuplicates")}
-          ${renderSortHeader("Date", "SPEC_DATE", sCol, sDir, "sortDuplicates")}
-          ${renderSortHeader("Type", "SPEC_TYPE", sCol, sDir, "sortDuplicates")}
-          ${renderSortHeader("Organism", "ORGANISM", sCol, sDir, "sortDuplicates")}
-          ${renderSortHeader("Sex", "SEX", sCol, sDir, "sortDuplicates")}
-          ${renderSortHeader("Age", "AGE", sCol, sDir, "sortDuplicates")}
-          ${renderSortHeader("Ward", "WARD", sCol, sDir, "sortDuplicates")}
-          <th style="text-align: right; width: 180px;">Actions</th>
+          ${renderSortHeader("Row", "ROW_IDX", sCol, sDir, "sortDuplicates", 'class="col-row"')}
+          ${renderSortHeader(matchedLabel, "MATCHED", sCol, sDir, "sortDuplicates", 'class="col-matched"')}
+          ${renderSortHeader(otherLabel, "OTHER", sCol, sDir, "sortDuplicates", 'class="col-other"')}
+          ${renderSortHeader("Patient Name", "FULL_NAME", sCol, sDir, "sortDuplicates", 'class="col-name"')}
+          ${renderSortHeader("Date", "SPEC_DATE", sCol, sDir, "sortDuplicates", 'class="col-date"')}
+          ${renderSortHeader("Type", "SPEC_TYPE", sCol, sDir, "sortDuplicates", 'class="col-type"')}
+          ${renderSortHeader("Organism", "ORGANISM", sCol, sDir, "sortDuplicates", 'class="col-org"')}
+          ${renderSortHeader("Sex", "SEX", sCol, sDir, "sortDuplicates", 'class="col-sex"')}
+          ${renderSortHeader("Age", "AGE", sCol, sDir, "sortDuplicates", 'class="col-age"')}
+          ${renderSortHeader("Ward", "WARD", sCol, sDir, "sortDuplicates", 'class="col-ward"')}
+          <th class="col-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -178,26 +178,31 @@ export function renderDuplicatesTable(rows, mode = state.dupMode) {
             const otherVal =
               mode === "patient" ? r.SPEC_NUM || "—" : r.PATIENT_ID || "—";
             const safeSpecNum = (r.SPEC_NUM || "").replace(/'/g, "\\'");
+            const fullName = r.FULL_NAME || "—";
+            const specType = r.SPEC_TYPE || "—";
+            const ward = r.WARD || "—";
 
             return `
             <tr class="dup-row ${clusterClass} ${startClass}">
               <td class="col-check" style="text-align: center;">
                 <input type="checkbox" class="dup-row-check" value="${r.ROW_IDX}" onchange="updateDupSelectedState()" />
               </td>
-              <td class="mono" style="color:var(--text3);font-size:11.5px">#${r.ROW_IDX}</td>
-              <td class="mono" style="font-size:12px;font-weight:700;color:var(--accent)">${matchedVal}</td>
-              <td class="mono" style="font-size:12px;color:var(--text2)">${otherVal}</td>
-              <td class="pt-name">${r.FULL_NAME || "—"}</td>
-              <td>${fmtDate(r.SPEC_DATE)}</td>
-              <td>${r.SPEC_TYPE || "—"}</td>
-              <td>${renderOrgBadge(r.ORGANISM)}</td>
-              <td>${r.SEX || "—"}</td>
-              <td>${r.AGE || "—"}</td>
-              <td>${r.WARD || "—"}</td>
-              <td style="text-align: right; white-space: nowrap;">
-                <button class="btn btn-ghost btn-xs" onclick="openEditModal(${r.ROW_IDX})" title="Edit / correct this isolate">Edit</button>
-                <button class="btn btn-ghost btn-xs" onclick="viewDetail(${r.ROW_IDX})" title="View isolate details">View</button>
-                <button class="btn btn-danger btn-xs" onclick="confirmDeleteRow(${r.ROW_IDX}, '${safeSpecNum}')" title="Delete this isolate">Del</button>
+              <td class="mono col-row" style="color:var(--text3);font-size:11px">#${r.ROW_IDX}</td>
+              <td class="mono col-matched" style="font-size:11.5px;font-weight:700;color:var(--accent)" title="${matchedVal}"><span class="cell-truncate">${matchedVal}</span></td>
+              <td class="mono col-other" style="font-size:11.5px;color:var(--text2)" title="${otherVal}"><span class="cell-truncate">${otherVal}</span></td>
+              <td class="pt-name col-name" title="${fullName}"><span class="cell-truncate">${fullName}</span></td>
+              <td class="col-date" style="white-space:nowrap;font-size:11.5px">${fmtDate(r.SPEC_DATE)}</td>
+              <td class="col-type" title="${specType}"><span class="cell-truncate">${specType}</span></td>
+              <td class="col-org">${renderOrgBadge(r.ORGANISM)}</td>
+              <td class="col-sex" style="text-align:center;">${r.SEX || "—"}</td>
+              <td class="col-age" style="text-align:center;">${r.AGE || "—"}</td>
+              <td class="col-ward" title="${ward}"><span class="cell-truncate">${ward}</span></td>
+              <td class="col-actions" style="text-align: right; white-space: nowrap;">
+                <div class="dup-actions-group">
+                  <button class="btn btn-ghost btn-xs" onclick="openEditModal(${r.ROW_IDX})" title="Edit / correct this isolate">Edit</button>
+                  <button class="btn btn-ghost btn-xs" onclick="viewDetail(${r.ROW_IDX})" title="View isolate details">View</button>
+                  <button class="btn btn-danger btn-xs" onclick="confirmDeleteRow(${r.ROW_IDX}, '${safeSpecNum}')" title="Delete this isolate">Del</button>
+                </div>
               </td>
             </tr>`;
           })

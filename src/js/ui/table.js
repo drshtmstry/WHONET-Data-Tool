@@ -23,7 +23,14 @@ export function renderSortHeader(label, column, activeCol, activeDir, onClickFnN
       : '<i class="fa-solid fa-arrow-down-wide-short sort-icon active"></i>';
   }
   const nextDir = isSorted && activeDir === 'asc' ? 'descending' : 'ascending';
-  return `<th class="sortable${sortedClass}" onclick="${onClickFnName}('${column}')" title="Click to sort by ${label} (${nextDir})" ${extraThAttrs}>
+  let extraClass = '';
+  let cleanedAttrs = extraThAttrs;
+  const classMatch = extraThAttrs.match(/class=["']([^"']+)["']/i);
+  if (classMatch) {
+    extraClass = ' ' + classMatch[1];
+    cleanedAttrs = extraThAttrs.replace(/class=["'][^"']+["']/i, '').trim();
+  }
+  return `<th class="sortable${sortedClass}${extraClass}" onclick="${onClickFnName}('${column}')" title="Click to sort by ${label} (${nextDir})" ${cleanedAttrs}>
     <div class="th-sort-content">
       <span>${label}</span>
       ${iconHtml}

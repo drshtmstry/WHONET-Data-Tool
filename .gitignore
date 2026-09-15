@@ -12,6 +12,9 @@ desktop-dist/
 *.db
 C:/WHONET/
 
+# Bundled sample databases are application assets and must be deployed
+!public/sample-data/*.sqlite
+
 # OS & Editor artifacts
 .DS_Store
 Thumbs.db
